@@ -6,7 +6,7 @@ from typing import Optional, Literal
 class Text2ImgRequest(BaseModel):
     prompt: str
     negative_prompt: Optional[str] = None
-    model: str = "ZImageTurbo_INT8"
+    model: str = "Flux_2_Klein_4B_BF16"
     width: int = 1024
     height: int = 768
     guidance: float = 3.5
@@ -42,7 +42,7 @@ class GenerationCreate(BaseModel):
     prompt: str
     negative_prompt: Optional[str] = None
     generation_type: Literal["text2img", "txt2video", "img2video"] = "text2img"
-    model: str = "ZImageTurbo_INT8"
+    model: str = "Flux_2_Klein_4B_BF16"
     width: int = 1024
     height: int = 768
     guidance: float = 3.5
@@ -95,3 +95,67 @@ class HealthResponse(BaseModel):
 class BalanceResponse(BaseModel):
     balance: float
     currency: str
+
+
+# AI Ads Generator Schemas
+class AdCampaignCreate(BaseModel):
+    user_prompt: str = Field(..., min_length=10, description="User's ad concept/idea")
+    brand_name: Optional[str] = Field(None, description="Brand name for the ad")
+    brand_description: Optional[str] = Field(None, description="Brief brand description")
+
+
+class AdCampaignResponse(BaseModel):
+    id: int
+    user_prompt: str
+    brand_name: Optional[str] = None
+    brand_description: Optional[str] = None
+    
+    # Pipeline status
+    current_step: str = "init"
+    
+    # Enhancement
+    enhanced_prompt: Optional[str] = None
+    enhancement_status: str = "pending"
+    
+    # Script
+    script: Optional[str] = None
+    script_status: str = "pending"
+    script_feedback: Optional[str] = None
+    
+    # Image
+    image_url: Optional[str] = None
+    image_status: str = "pending"
+    image_feedback: Optional[str] = None
+    
+    # Video
+    video_url: Optional[str] = None
+    video_status: str = "pending"
+    video_feedback: Optional[str] = None
+    
+    # QA
+    qa_status: str = "pending"
+    qa_feedback: Optional[str] = None
+    qa_details: Optional[str] = None
+    qa_iterations: int = 0
+    
+    # Overall
+    overall_status: str = "pending"
+    error_message: Optional[str] = None
+    
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdCampaignListResponse(BaseModel):
+    items: list[AdCampaignResponse]
+    total: int
+    page: int
+    pages: int
+
+
+class RedoRequest(BaseModel):
+    step: Literal["script", "image", "video"] = Field(..., description="Which step to redo")
+    feedback: Optional[str] = Field(None, description="Additional feedback for the redo")

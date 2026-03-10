@@ -298,10 +298,18 @@ export default {
       }
     },
     
+    async refreshAll() {
+      // Single method to refresh both recent and gallery
+      await this.loadRecentGenerations()
+      if (this.$refs.gallery) {
+        this.$refs.gallery.refresh()
+      }
+    },
+    
     startRecentPolling() {
       this.recentPollingInterval = setInterval(() => {
         this.pollRecentInProgress()
-      }, 2000)
+      }, 5000) // Poll every 5 seconds instead of 2
     },
     
     stopRecentPolling() {
@@ -326,10 +334,7 @@ export default {
           }
           
           if (updated.status === 'completed' || updated.status === 'failed') {
-            this.loadRecentGenerations()
-            if (this.$refs.gallery) {
-              this.$refs.gallery.refresh()
-            }
+            this.refreshAll()
           }
         } catch (error) {
           console.error('Polling error:', error)
@@ -379,10 +384,7 @@ export default {
             this.clearUploadedImage()
           }
           this.startPolling(result.id)
-          this.loadRecentGenerations()
-          if (this.$refs.gallery) {
-            this.$refs.gallery.refresh()
-          }
+          this.refreshAll()
         }
       } catch (error) {
         console.error('Generation failed:', error)
@@ -431,12 +433,9 @@ export default {
           
           if (updated.status === 'completed') {
             this.stopPolling(generationId)
-            this.loadRecentGenerations()
+            this.refreshAll()
             if (updated.remote_url) {
               this.previewImage = updated.remote_url
-            }
-            if (this.$refs.gallery) {
-              this.$refs.gallery.refresh()
             }
           } else if (updated.status === 'failed') {
             this.stopPolling(generationId)
@@ -445,7 +444,7 @@ export default {
           console.error('Polling error:', error)
           this.stopPolling(generationId)
         }
-      }, 3000)
+      }, 5000) // Poll every 5 seconds instead of 3
       
       this.pollingIds[generationId] = pollId
       setTimeout(() => this.stopPolling(generationId), 10 * 60 * 1000)
@@ -559,10 +558,7 @@ export default {
 
         this.closeVideoModal()
         this.startPolling(result.id)
-        this.loadRecentGenerations()
-        if (this.$refs.gallery) {
-          this.$refs.gallery.refresh()
-        }
+        this.refreshAll()
       } catch (error) {
         console.error('Video generation failed:', error)
         alert('Failed to generate video.')

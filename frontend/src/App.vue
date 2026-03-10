@@ -4,43 +4,41 @@
       <!-- Left Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <div class="logo">
+          <router-link to="/" class="logo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"/>
               <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
             </svg>
             <span>Videlo</span>
-          </div>
+          </router-link>
         </div>
         
         <nav class="nav-menu">
           <div class="nav-section">
             <span class="nav-section-title">Generate</span>
-            <button 
-              :class="['nav-item', { active: currentView === 'text2img' }]"
-              @click="currentView = 'text2img'"
-            >
+            <router-link to="/text2img" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <path d="M21 15l-5-5L5 21"/>
               </svg>
               <span>Text to Image</span>
-            </button>
-            <button 
-              :class="['nav-item', { active: currentView === 'txt2video' }]"
-              @click="currentView = 'txt2video'"
-            >
+            </router-link>
+            <router-link to="/imgedit" class="nav-item" active-class="active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              <span>Image Edit</span>
+            </router-link>
+            <router-link to="/txt2video" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="4" width="20" height="16" rx="2"/>
                 <path d="M10 9l5 3-5 3V9z"/>
               </svg>
               <span>Text to Video</span>
-            </button>
-            <button 
-              :class="['nav-item', { active: currentView === 'img2video' }]"
-              @click="currentView = 'img2video'"
-            >
+            </router-link>
+            <router-link to="/img2video" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -48,15 +46,21 @@
                 <path d="M17 11l4 4-4 4"/>
               </svg>
               <span>Image to Video</span>
-            </button>
+            </router-link>
+            <router-link to="/ads" class="nav-item" active-class="active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="M10 9l5 3-5 3V9z"/>
+                <circle cx="17" cy="7" r="2"/>
+                <path d="M17 7l2-2"/>
+              </svg>
+              <span>AI Ads Generator</span>
+            </router-link>
           </div>
           
           <div class="nav-section">
             <span class="nav-section-title">Library</span>
-            <button 
-              :class="['nav-item', { active: currentView === 'gallery' }]"
-              @click="currentView = 'gallery'"
-            >
+            <router-link to="/gallery" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7" rx="1"/>
                 <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -64,7 +68,7 @@
                 <rect x="14" y="14" width="7" height="7" rx="1"/>
               </svg>
               <span>Gallery</span>
-            </button>
+            </router-link>
           </div>
         </nav>
         
@@ -85,7 +89,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
-            <span class="breadcrumb-item active">{{ currentViewTitle }}</span>
+            <span class="breadcrumb-item active">{{ currentRouteTitle }}</span>
           </div>
           <div class="header-actions">
             <button class="icon-btn" title="Settings">
@@ -99,9 +103,9 @@
 
         <!-- Page Content -->
         <div class="page-content">
-          <Home 
-            ref="home"
-            :current-view="currentView"
+          <router-view 
+            ref="pageComponent"
+            :current-view="currentMode"
             :generation-options="generationOptions"
             @update-options="updateOptions"
           />
@@ -109,7 +113,7 @@
       </main>
 
       <!-- Right Settings Panel -->
-      <aside class="settings-panel">
+      <aside v-if="showSettingsPanel" class="settings-panel">
         <div class="settings-tabs">
           <button 
             :class="['tab', { active: settingsTab === 'form' }]"
@@ -126,8 +130,12 @@
           <div class="setting-group">
             <label>Model</label>
             <select v-model="generationOptions.model" class="setting-select">
-              <optgroup v-if="currentView === 'text2img'" label="Image Models">
+              <optgroup v-if="currentMode === 'text2img'" label="Image Models">
+                <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
                 <option value="ZImageTurbo_INT8">ZImage Turbo</option>
+              </optgroup>
+              <optgroup v-else-if="currentMode === 'imgedit'" label="Image Edit Models">
+                <option value="QwenImageEdit_Plus_NF4">Qwen Image Edit</option>
                 <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
               </optgroup>
               <optgroup v-else label="Video Models">
@@ -139,8 +147,8 @@
             </select>
           </div>
 
-          <!-- Dimensions -->
-          <div class="setting-group">
+          <!-- Dimensions (hide for imgedit) -->
+          <div v-if="currentMode !== 'imgedit'" class="setting-group">
             <label>Dimensions</label>
             <div class="dimension-inputs">
               <div class="dim-input">
@@ -184,8 +192,8 @@
               v-if="generationOptions.model !== 'Flux_2_Klein_4B_BF16'"
               type="range" 
               v-model.number="generationOptions.steps"
-              :min="currentView === 'text2img' ? 1 : 10"
-              :max="currentView === 'text2img' ? 30 : 50"
+              :min="currentMode === 'text2img' ? 1 : 10"
+              :max="currentMode === 'text2img' ? 30 : 50"
               class="setting-slider"
             >
             <div v-else class="steps-fixed">
@@ -240,7 +248,7 @@
           </div>
 
           <!-- Video Options -->
-          <template v-if="currentView !== 'text2img'">
+          <template v-if="currentMode === 'txt2video' || currentMode === 'img2video'">
             <div class="setting-divider"></div>
             
             <div class="setting-group">
@@ -274,21 +282,16 @@
 </template>
 
 <script>
-import Home from './views/Home.vue'
 import api from './services/api.js'
 
 export default {
   name: 'App',
-  components: {
-    Home
-  },
   data() {
     return {
-      currentView: 'text2img',
       settingsTab: 'form',
       balance: null,
       generationOptions: {
-        model: 'ZImageTurbo_INT8',
+        model: 'Flux_2_Klein_4B_BF16',
         width: 1024,
         height: 576,
         steps: 4,
@@ -300,14 +303,15 @@ export default {
     }
   },
   computed: {
-    currentViewTitle() {
-      const titles = {
-        text2img: 'Text to Image',
-        txt2video: 'Text to Video',
-        img2video: 'Image to Video',
-        gallery: 'Gallery'
-      }
-      return titles[this.currentView] || 'Generate'
+    currentMode() {
+      return this.$route.meta.mode || this.$route.name
+    },
+    currentRouteTitle() {
+      return this.$route.meta.title || 'Generate'
+    },
+    showSettingsPanel() {
+      // Hide settings for ads (uses internal pipeline) and gallery
+      return !['ads', 'gallery'].includes(this.$route.name)
     },
     aspectPresets() {
       return [
@@ -325,12 +329,14 @@ export default {
     }
   },
   watch: {
-    currentView(view) {
-      // Update model based on view
-      if (view === 'text2img') {
-        this.generationOptions.model = 'ZImageTurbo_INT8'
-      } else {
+    currentMode(mode) {
+      // Update model based on mode
+      if (mode === 'text2img') {
+        this.generationOptions.model = 'Flux_2_Klein_4B_BF16'
+      } else if (mode === 'txt2video' || mode === 'img2video') {
         this.generationOptions.model = 'Ltx2_19B_Dist_FP8'
+      } else if (mode === 'imgedit') {
+        this.generationOptions.model = 'QwenImageEdit_Plus_NF4'
       }
     },
     'generationOptions.model'(model) {
@@ -341,13 +347,33 @@ export default {
     }
   },
   mounted() {
-    this.fetchBalance()
+    this.loadCachedBalance()
   },
   methods: {
+    loadCachedBalance() {
+      // Use cached balance if available and less than 5 minutes old
+      const cached = localStorage.getItem('videlo_balance')
+      if (cached) {
+        try {
+          const { balance, timestamp } = JSON.parse(cached)
+          const age = Date.now() - timestamp
+          if (age < 5 * 60 * 1000) { // 5 minutes
+            this.balance = balance
+            return
+          }
+        } catch (e) {}
+      }
+      this.fetchBalance()
+    },
     async fetchBalance() {
       try {
         const response = await api.getBalance()
         this.balance = response.balance
+        // Cache for 5 minutes
+        localStorage.setItem('videlo_balance', JSON.stringify({
+          balance: response.balance,
+          timestamp: Date.now()
+        }))
       } catch (error) {
         console.error('Failed to fetch balance:', error)
       }
@@ -427,6 +453,7 @@ body {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
+  text-decoration: none;
 }
 
 .logo svg {
@@ -470,6 +497,7 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
+  text-decoration: none;
 }
 
 .nav-item svg {

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
-from .routes import generations, prompts
+from .routes import generations, prompts, ads
 
 # Create FastAPI app
 app = FastAPI(
@@ -25,6 +25,7 @@ app.add_middleware(
 # Include routers
 app.include_router(generations.router)
 app.include_router(prompts.router)
+app.include_router(ads.router)
 
 
 @app.on_event("startup")

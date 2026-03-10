@@ -141,6 +141,42 @@ class DeAPIClient:
                 response.raise_for_status()
                 return await response.json()
     
+    async def generate_img2img(
+        self,
+        image: bytes,
+        prompt: str,
+        model: str = "QwenImageEdit_Plus_NF4",
+        guidance: float = 3.5,
+        steps: int = 20,
+        seed: int = -1,
+        negative_prompt: Optional[str] = None,
+        image_filename: str = "image.png"
+    ) -> dict:
+        """Submit image-to-image transformation request to deAPI."""
+        # Build multipart form data
+        data = aiohttp.FormData()
+        data.add_field('image', image, filename=image_filename, content_type='image/png')
+        data.add_field('prompt', prompt)
+        data.add_field('model', model)
+        data.add_field('guidance', str(guidance))
+        data.add_field('steps', str(steps))
+        data.add_field('seed', str(seed))
+        
+        if negative_prompt:
+            data.add_field('negative_prompt', negative_prompt)
+        
+        async with aiohttp.ClientSession(
+            connector=self._create_connector(),
+            headers=self.headers,
+            timeout=aiohttp.ClientTimeout(total=120)
+        ) as session:
+            async with session.post(
+                f"{self.base_url}/api/v1/client/img2img",
+                data=data
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
+    
     async def get_request_status(self, request_id: str) -> dict:
         """Get the status of a request."""
         async with aiohttp.ClientSession(

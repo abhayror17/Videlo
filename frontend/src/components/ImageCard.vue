@@ -55,9 +55,15 @@
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
             </svg>
           </a>
-          <button v-if="!isVideo" class="action-btn video" @click.stop="$emit('create-video')" title="Create Video">
+          <button v-if="!isVideo && !showUseButton" class="action-btn video" @click.stop="$emit('create-video')" title="Create Video">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>
+            </svg>
+          </button>
+          <button v-if="showUseButton" class="action-btn use" @click.stop="$emit('use-image')" title="Use Image">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
         </div>
@@ -73,9 +79,13 @@ export default {
     generation: {
       type: Object,
       required: true
+    },
+    showUseButton: {
+      type: Boolean,
+      default: false
     }
   },
-  emits: ['fullscreen', 'create-video'],
+  emits: ['fullscreen', 'create-video', 'use-image'],
   computed: {
     isVideo() {
       return this.generation.generation_type === 'img2video' ||
@@ -232,6 +242,10 @@ export default {
 }
 
 .action-btn.video:hover {
+  background: var(--accent-secondary);
+}
+
+.action-btn.use:hover {
   background: var(--accent-secondary);
 }
 </style>

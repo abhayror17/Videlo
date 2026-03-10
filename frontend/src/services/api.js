@@ -14,7 +14,7 @@ export default {
     const response = await api.post('/generate/text2img', {
       prompt,
       negative_prompt: options.negativePrompt,
-      model: options.model || 'ZImageTurbo_INT8',
+      model: options.model || 'Flux_2_Klein_4B_BF16',
       width: options.width || 1024,
       height: options.height || 768,
       guidance: options.guidance ?? 3.5,
@@ -86,6 +86,50 @@ export default {
     return response.data
   },
 
+  // Image-to-Image generation (edit/transform images)
+  async generateImg2Img(imageFile, prompt, options = {}) {
+    const formData = new FormData()
+    formData.append('image', imageFile)
+    formData.append('prompt', prompt)
+    formData.append('model', options.model || 'QwenImageEdit_Plus_NF4')
+    formData.append('guidance', options.guidance ?? 3.5)
+    formData.append('steps', options.steps || 20)
+    formData.append('seed', options.seed ?? -1)
+    if (options.negativePrompt) {
+      formData.append('negative_prompt', options.negativePrompt)
+    }
+
+    const response = await api.post('/generate/img2img', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      timeout: 120000
+    })
+    return response.data
+  },
+
+  // Image-to-Image generation using gallery image (generation_id)
+  async generateImg2ImgFromGeneration(generationId, prompt, options = {}) {
+    const formData = new FormData()
+    formData.append('generation_id', generationId)
+    formData.append('prompt', prompt)
+    formData.append('model', options.model || 'QwenImageEdit_Plus_NF4')
+    formData.append('guidance', options.guidance ?? 3.5)
+    formData.append('steps', options.steps || 20)
+    formData.append('seed', options.seed ?? -1)
+    if (options.negativePrompt) {
+      formData.append('negative_prompt', options.negativePrompt)
+    }
+
+    const response = await api.post('/generate/img2img', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      timeout: 120000
+    })
+    return response.data
+  },
+
   // Legacy generate method (defaults to text2img)
   async generate(prompt, options = {}) {
     return this.generateText2Img(prompt, options)
@@ -145,6 +189,44 @@ export default {
   async getRandomPrompt() {
     const response = await api.get('/random-prompt', {
       timeout: 30000
+    })
+    return response.data
+  },
+
+  // AI Ads Generator APIs
+  // Create a new ad campaign
+  async createAdCampaign(data) {
+    const response = await api.post('/ads/generate', data, {
+      timeout: 30000
+    })
+    return response.data
+  },
+
+  // Get list of ad campaigns
+  async getAdCampaigns(page = 1, perPage = 10) {
+    const response = await api.get('/ads', {
+      params: { page, per_page: perPage }
+    })
+    return response.data
+  },
+
+  // Get a specific ad campaign
+  async getAdCampaign(campaignId) {
+    const response = await api.get(`/ads/${campaignId}`)
+    return response.data
+  },
+
+  // Get campaign status (for polling)
+  async getAdCampaignStatus(campaignId) {
+    const response = await api.get(`/ads/${campaignId}/status`)
+    return response.data
+  },
+
+  // Redo a specific step
+  async redoAdCampaignStep(campaignId, step, feedback = null) {
+    const response = await api.post(`/ads/${campaignId}/redo`, {
+      step,
+      feedback
     })
     return response.data
   }

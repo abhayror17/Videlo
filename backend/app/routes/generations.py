@@ -98,12 +98,12 @@ async def create_text2img(
     generation = Generation(
         prompt=request.prompt,
         negative_prompt=request.negative_prompt,
-        model=request.model,
+        model=request.model or "Flux_2_Klein_4B_BF16",
         generation_type="text2img",
         width=request.width,
         height=request.height,
         guidance=request.guidance,
-        steps=request.steps,
+        steps=request.steps or 4,
         seed=actual_seed,
         status="pending",
         progress=0
@@ -304,6 +304,111 @@ async def create_img2video(
             frames=frames,
             seed=actual_seed,
             fps=fps
+        )
+        
+        # Update with request_id from deAPI
+        data = result.get("data", {})
+        generation.uuid = data.get("request_id")
+        generation.status = "processing"
+        
+        db.commit()
+        db.refresh(generation)
+        
+        # Start polling for result
+        background_tasks.add_task(
+            poll_for_result,
+            generation.uuid,
+            generation.id
+        )
+        
+        return generation
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        generation.status = "failed"
+        generation.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/generate/img2img", response_model=GenerationResponse)
+async def create_img2img(
+    background_tasks: BackgroundTasks,
+    image: UploadFile = File(None),
+    generation_id: int = Form(None),
+    prompt: str = Form(...),
+    model: str = Form("QwenImageEdit_Plus_NF4"),
+    guidance: float = Form(3.5),
+    steps: int = Form(20),
+    seed: int = Form(-1),
+    negative_prompt: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Submit a new image-to-image transformation request to deAPI.
+    
+    Either provide image file directly or generation_id to fetch from existing generation.
+    Models: QwenImageEdit_Plus_NF4 (style transfer), Flux_2_Klein_4B_BF16 (general editing)
+    """
+    import httpx
+    client = get_deapi_client()
+    
+    # Generate random seed if not provided
+    actual_seed = get_seed(seed)
+    
+    # Create pending record
+    generation = Generation(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        model=model,
+        generation_type="img2img",
+        guidance=guidance,
+        steps=steps,
+        seed=actual_seed,
+        status="pending",
+        progress=0
+    )
+    db.add(generation)
+    db.commit()
+    db.refresh(generation)
+    
+    try:
+        image_content = None
+        image_filename = "image.png"
+        
+        # Option 1: File uploaded directly
+        if image and image.filename:
+            if not image.content_type or not image.content_type.startswith("image/"):
+                raise HTTPException(status_code=400, detail="Uploaded file must be an image")
+            image_content = await image.read()
+            image_filename = image.filename
+        
+        # Option 2: Fetch from existing generation
+        elif generation_id:
+            source_gen = db.query(Generation).filter(Generation.id == generation_id).first()
+            if not source_gen:
+                raise HTTPException(status_code=404, detail="Source generation not found")
+            if not source_gen.remote_url:
+                raise HTTPException(status_code=400, detail="Source generation has no image URL")
+            
+            # Fetch image from URL (server-side, no CORS issues)
+            async with httpx.AsyncClient(verify=False) as http_client:
+                response = await http_client.get(source_gen.remote_url, timeout=30.0)
+                response.raise_for_status()
+                image_content = response.content
+        else:
+            raise HTTPException(status_code=400, detail="Either image file or generation_id is required")
+        
+        # Call deAPI img2img endpoint
+        result = await client.generate_img2img(
+            image=image_content,
+            prompt=prompt,
+            model=model,
+            guidance=guidance,
+            steps=steps,
+            seed=actual_seed,
+            negative_prompt=negative_prompt,
+            image_filename=image_filename
         )
         
         # Update with request_id from deAPI

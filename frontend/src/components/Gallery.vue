@@ -95,17 +95,11 @@ export default {
       initialLoad: true,
       page: 1,
       totalPages: 1,
-      filterType: 'all',
-      pollingInterval: null,
-      pollingIds: new Set()
+      filterType: 'all'
     }
   },
   async mounted() {
     await this.loadGenerations()
-    this.startPollingInProgress()
-  },
-  beforeUnmount() {
-    this.stopPolling()
   },
   computed: {
     displayPages() {
@@ -159,46 +153,6 @@ export default {
     },
     async refresh() {
       await this.loadGenerations()
-    },
-    
-    startPollingInProgress() {
-      // Poll every 2 seconds for in-progress items
-      this.pollingInterval = setInterval(() => {
-        this.pollInProgressItems()
-      }, 2000)
-    },
-    
-    stopPolling() {
-      if (this.pollingInterval) {
-        clearInterval(this.pollingInterval)
-        this.pollingInterval = null
-      }
-    },
-    
-    async pollInProgressItems() {
-      const inProgress = this.generations.filter(g => g.status === 'processing')
-      
-      if (inProgress.length === 0) return
-      
-      for (const gen of inProgress) {
-        try {
-          const updated = await api.getStatus(gen.id)
-          
-          // Update the generation in the array
-          const index = this.generations.findIndex(g => g.id === gen.id)
-          if (index !== -1) {
-            this.generations[index] = { ...this.generations[index], ...updated }
-          }
-          
-          // If completed or failed, refresh the list to get final state
-          if (updated.status === 'completed' || updated.status === 'failed') {
-            // Small delay then refresh to ensure we have latest data
-            setTimeout(() => this.loadGenerations(), 500)
-          }
-        } catch (error) {
-          console.error('Polling error for gen', gen.id, error)
-        }
-      }
     }
   }
 }
