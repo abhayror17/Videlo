@@ -71,7 +71,7 @@
         <div class="sidebar-footer">
           <div class="api-balance">
             <span class="balance-label">Credits</span>
-            <span class="balance-value">--</span>
+            <span class="balance-value">{{ balance !== null ? '$' + balance.toFixed(2) : '--' }}</span>
           </div>
         </div>
       </aside>
@@ -272,6 +272,7 @@
 
 <script>
 import Home from './views/Home.vue'
+import api from './services/api.js'
 
 export default {
   name: 'App',
@@ -282,6 +283,7 @@ export default {
     return {
       currentView: 'text2img',
       settingsTab: 'form',
+      balance: null,
       generationOptions: {
         model: 'ZImageTurbo_INT8',
         width: 1024,
@@ -329,7 +331,18 @@ export default {
       }
     }
   },
+  mounted() {
+    this.fetchBalance()
+  },
   methods: {
+    async fetchBalance() {
+      try {
+        const response = await api.getBalance()
+        this.balance = response.balance
+      } catch (error) {
+        console.error('Failed to fetch balance:', error)
+      }
+    },
     setAspectPreset(preset) {
       this.generationOptions.width = preset.width
       this.generationOptions.height = preset.height
