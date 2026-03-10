@@ -4,10 +4,28 @@
     <div v-if="currentView !== 'gallery'" class="generation-view">
       <!-- Image Preview Area -->
       <div class="preview-area">
-        <div v-if="previewImage" class="preview-image-container">
-          <img :src="previewImage" class="preview-image" />
+        <!-- Upload area for img2video -->
+        <div v-if="currentView === 'img2video' && !previewImage && !uploadedImagePreview" class="upload-area-main" @click="$refs.mainFileInput.click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>Click to upload an image</p>
+          <span>or select from Recent below</span>
+          <input 
+            ref="mainFileInput"
+            type="file" 
+            accept="image/*"
+            style="display: none"
+            @change="handleMainFileUpload"
+          />
+        </div>
+        <!-- Preview image -->
+        <div v-else-if="previewImage || uploadedImagePreview" class="preview-image-container">
+          <img :src="previewImage || uploadedImagePreview" class="preview-image" />
           <div class="preview-overlay">
-            <button class="overlay-btn" @click="previewImage = null">
+            <button class="overlay-btn" @click="clearUploadedImage">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"/>
                 <line x1="6" y1="6" x2="18" y2="18"/>
@@ -15,6 +33,7 @@
             </button>
           </div>
         </div>
+        <!-- Default placeholder for other views -->
         <div v-else class="preview-placeholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -97,7 +116,7 @@
             v-for="gen in recentGenerations.slice(0, 4)"
             :key="gen.id"
             :generation="gen"
-            @fullscreen="openModal(gen)"
+            @fullscreen="currentView === 'img2video' ? selectImageForVideo(gen) : openModal(gen)"
             @create-video="openVideoModal(gen)"
           />
         </div>
@@ -321,6 +340,12 @@ export default {
     async handleGenerate() {
       if (!this.prompt.trim() || this.generating) return
       
+      // For img2video, require an image
+      if (this.currentView === 'img2video' && !this.uploadedImageFile && !this.selectedImage) {
+        alert('Please upload an image or select one from Recent')
+        return
+      }
+      
       this.generating = true
       try {
         let result
@@ -335,9 +360,24 @@ export default {
           options.frames = this.generationOptions.frames || 48
           options.fps = this.generationOptions.fps || 24
           result = await api.generateTxt2Video(this.prompt, options)
+        } else if (this.currentView === 'img2video') {
+          options.frames = this.generationOptions.frames || 48
+          options.fps = this.generationOptions.fps || 24
+          options.width = this.generationOptions.width || 512
+          options.height = this.generationOptions.height || 512
+          
+          if (this.uploadedImageFile) {
+            result = await api.generateImg2VideoWithFile(this.uploadedImageFile, this.prompt, options)
+          } else if (this.selectedImage) {
+            result = await api.generateImg2Video(this.selectedImage.id, this.prompt, options)
+          }
         }
         
         if (result) {
+          // Clear uploaded image after successful generation
+          if (this.currentView === 'img2video') {
+            this.clearUploadedImage()
+          }
           this.startPolling(result.id)
           this.loadRecentGenerations()
           if (this.$refs.gallery) {
@@ -446,6 +486,29 @@ export default {
       }
       this.uploadedImageFile = file
       this.uploadedImagePreview = URL.createObjectURL(file)
+    },
+
+    handleMainFileUpload(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file')
+        return
+      }
+      this.uploadedImageFile = file
+      this.uploadedImagePreview = URL.createObjectURL(file)
+    },
+
+    clearUploadedImage() {
+      this.uploadedImageFile = null
+      this.uploadedImagePreview = null
+      this.selectedImage = null
+    },
+
+    selectImageForVideo(gen) {
+      this.selectedImage = gen
+      this.uploadedImageFile = null
+      this.uploadedImagePreview = gen.remote_url || gen.thumbnail_url
     },
 
     closeVideoModal() {
@@ -840,6 +903,44 @@ export default {
   padding: 48px 24px;
   cursor: pointer;
   color: var(--text-muted);
+}
+
+.upload-area-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.upload-area-main:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.upload-area-main svg {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.upload-area-main p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.upload-area-main span {
+  font-size: 0.8125rem;
 }
 
 .upload-area svg {
