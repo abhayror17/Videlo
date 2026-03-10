@@ -4,6 +4,7 @@ from sqlalchemy import text
 from typing import Optional
 from math import ceil
 from datetime import datetime, timezone
+import random
 
 from ..database import get_db
 from ..models import Generation
@@ -18,6 +19,13 @@ from ..schemas import (
     Img2VideoRequest
 )
 from ..services.deapi import get_deapi_client
+
+
+def get_seed(seed: int) -> int:
+    """Return a random positive seed if seed is -1, otherwise return the provided seed."""
+    if seed == -1:
+        return random.randint(1, 2147483647)
+    return seed
 
 router = APIRouter(prefix="/api", tags=["generations"])
 
@@ -83,6 +91,9 @@ async def create_text2img(
     """Submit a new text-to-image generation request to deAPI."""
     client = get_deapi_client()
     
+    # Generate random seed if not provided
+    actual_seed = get_seed(request.seed)
+    
     # Create pending record
     generation = Generation(
         prompt=request.prompt,
@@ -93,7 +104,7 @@ async def create_text2img(
         height=request.height,
         guidance=request.guidance,
         steps=request.steps,
-        seed=request.seed,
+        seed=actual_seed,
         status="pending",
         progress=0
     )
@@ -111,7 +122,7 @@ async def create_text2img(
             height=request.height,
             guidance=request.guidance,
             steps=request.steps,
-            seed=request.seed
+            seed=actual_seed
         )
         
         # Update with request_id from deAPI
@@ -149,6 +160,9 @@ async def create_txt2video(
     """Submit a new text-to-video generation request to deAPI."""
     client = get_deapi_client()
     
+    # Generate random seed if not provided
+    actual_seed = get_seed(request.seed)
+    
     # Create pending record
     generation = Generation(
         prompt=request.prompt,
@@ -160,7 +174,7 @@ async def create_txt2video(
         fps=request.fps,
         guidance=request.guidance,
         steps=request.steps,
-        seed=request.seed,
+        seed=actual_seed,
         status="pending",
         progress=0
     )
@@ -178,7 +192,7 @@ async def create_txt2video(
             guidance=request.guidance,
             steps=request.steps,
             frames=request.frames,
-            seed=request.seed,
+            seed=actual_seed,
             fps=request.fps
         )
         
@@ -231,6 +245,9 @@ async def create_img2video(
     import httpx
     client = get_deapi_client()
     
+    # Generate random seed if not provided
+    actual_seed = get_seed(seed)
+    
     # Create pending record
     generation = Generation(
         prompt=prompt,
@@ -242,7 +259,7 @@ async def create_img2video(
         fps=fps,
         guidance=guidance,
         steps=steps,
-        seed=seed,
+        seed=actual_seed,
         status="pending",
         progress=0
     )
@@ -285,7 +302,7 @@ async def create_img2video(
             guidance=guidance,
             steps=steps,
             frames=frames,
-            seed=seed,
+            seed=actual_seed,
             fps=fps
         )
         
