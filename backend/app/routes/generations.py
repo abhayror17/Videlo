@@ -28,17 +28,16 @@ async def poll_for_result(request_id: str, generation_id: int):
     from ..database import SessionLocal
     
     client = get_deapi_client()
-    poll_count = 0
     
     for _ in range(120):  # Poll for up to 10 minutes
-        await asyncio.sleep(5)
-        poll_count += 1
+        await asyncio.sleep(3)  # Poll every 3 seconds for more responsive updates
         
         db = SessionLocal()
         try:
             result = await client.get_request_status(request_id)
             data = result.get("data", {})
             status = data.get("status")
+            progress = data.get("progress", 0)  # Real progress from API
             
             generation = db.query(Generation).filter(
                 Generation.id == generation_id
@@ -59,11 +58,10 @@ async def poll_for_result(request_id: str, generation_id: int):
                 generation.error_message = data.get("error", "Generation failed")
                 db.commit()
                 return
-            elif status == "processing":
+            elif status in ("processing", "pending"):
                 generation.status = "processing"
-                # Simulate progress: increase by ~1% every 5 seconds, cap at 95%
-                simulated_progress = min(95, int(poll_count * 1.5) + 10)
-                generation.progress = simulated_progress
+                # Use real progress from API, cap at 98% until complete
+                generation.progress = min(98, int(progress) if progress else 5)
                 db.commit()
                 # Continue polling
                 
