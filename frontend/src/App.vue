@@ -128,7 +128,6 @@
             <select v-model="generationOptions.model" class="setting-select">
               <optgroup v-if="currentView === 'text2img'" label="Image Models">
                 <option value="ZImageTurbo_INT8">ZImage Turbo</option>
-                <option value="Flux1schnell">Flux 1 Schnell</option>
                 <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
               </optgroup>
               <optgroup v-else label="Video Models">
@@ -182,13 +181,17 @@
               <span class="setting-value">{{ generationOptions.steps }}</span>
             </div>
             <input 
+              v-if="generationOptions.model !== 'Flux_2_Klein_4B_BF16'"
               type="range" 
               v-model.number="generationOptions.steps"
               :min="currentView === 'text2img' ? 1 : 10"
               :max="currentView === 'text2img' ? 30 : 50"
               class="setting-slider"
             >
-            <div class="slider-labels">
+            <div v-else class="steps-fixed">
+              <span class="fixed-label">Fixed at 4 for Flux 2</span>
+            </div>
+            <div class="slider-labels" v-if="generationOptions.model !== 'Flux_2_Klein_4B_BF16'">
               <span>Fast</span>
               <span>Quality</span>
             </div>
@@ -287,8 +290,8 @@ export default {
       generationOptions: {
         model: 'ZImageTurbo_INT8',
         width: 1024,
-        height: 768,
-        steps: 8,
+        height: 576,
+        steps: 4,
         guidance: 3.5,
         seed: -1,
         frames: 48,
@@ -328,6 +331,12 @@ export default {
         this.generationOptions.model = 'ZImageTurbo_INT8'
       } else {
         this.generationOptions.model = 'Ltx2_19B_Dist_FP8'
+      }
+    },
+    'generationOptions.model'(model) {
+      // Flux 2 requires exactly 4 steps
+      if (model === 'Flux_2_Klein_4B_BF16') {
+        this.generationOptions.steps = 4
       }
     }
   },
@@ -793,6 +802,16 @@ body {
   margin-top: 6px;
   font-size: 0.65rem;
   color: var(--text-muted);
+}
+
+.steps-fixed {
+  padding: 8px 0;
+}
+
+.fixed-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* Seed Input */
