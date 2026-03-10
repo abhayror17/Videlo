@@ -93,17 +93,13 @@
       <div v-if="recentGenerations.length > 0" class="recent-section">
         <h3>Recent</h3>
         <div class="recent-grid">
-          <div 
-            v-for="gen in recentGenerations.slice(0, 4)" 
+          <ImageCard
+            v-for="gen in recentGenerations.slice(0, 4)"
             :key="gen.id"
-            class="recent-item"
-            @click="openModal(gen)"
-          >
-            <img 
-              v-if="gen.thumbnail_url || gen.remote_url"
-              :src="gen.thumbnail_url || gen.remote_url"
-            />
-          </div>
+            :generation="gen"
+            @fullscreen="openModal(gen)"
+            @create-video="openVideoModal(gen)"
+          />
         </div>
       </div>
     </div>
@@ -206,6 +202,7 @@
 
 <script>
 import Gallery from '../components/Gallery.vue'
+import ImageCard from '../components/ImageCard.vue'
 import ImageModal from '../components/ImageModal.vue'
 import api from '../services/api.js'
 
@@ -213,6 +210,7 @@ export default {
   name: 'Home',
   components: {
     Gallery,
+    ImageCard,
     ImageModal
   },
   props: {
@@ -236,6 +234,7 @@ export default {
       gettingRandom: false,
       pollingIds: {},
       recentGenerations: [],
+      recentPollingInterval: null,
       // Video modal state
       videoModalVisible: false,
       selectedImage: null,
@@ -265,6 +264,10 @@ export default {
   },
   mounted() {
     this.loadRecentGenerations()
+    this.startRecentPolling()
+  },
+  beforeUnmount() {
+    this.stopRecentPolling()
   },
   methods: {
     async loadRecentGenerations() {
@@ -273,6 +276,45 @@ export default {
         this.recentGenerations = response.items || []
       } catch (error) {
         console.error('Failed to load recent generations:', error)
+      }
+    },
+    
+    startRecentPolling() {
+      this.recentPollingInterval = setInterval(() => {
+        this.pollRecentInProgress()
+      }, 2000)
+    },
+    
+    stopRecentPolling() {
+      if (this.recentPollingInterval) {
+        clearInterval(this.recentPollingInterval)
+        this.recentPollingInterval = null
+      }
+    },
+    
+    async pollRecentInProgress() {
+      const inProgress = this.recentGenerations.filter(g => g.status === 'processing')
+      
+      if (inProgress.length === 0) return
+      
+      for (const gen of inProgress) {
+        try {
+          const updated = await api.getStatus(gen.id)
+          
+          const index = this.recentGenerations.findIndex(g => g.id === gen.id)
+          if (index !== -1) {
+            this.recentGenerations[index] = { ...this.recentGenerations[index], ...updated }
+          }
+          
+          if (updated.status === 'completed' || updated.status === 'failed') {
+            this.loadRecentGenerations()
+            if (this.$refs.gallery) {
+              this.$refs.gallery.refresh()
+            }
+          }
+        } catch (error) {
+          console.error('Polling error:', error)
+        }
       }
     },
     
@@ -718,27 +760,6 @@ export default {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-}
-
-.recent-item {
-  aspect-ratio: 1;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.recent-item:hover {
-  border-color: var(--border-hover);
-  transform: scale(1.02);
-}
-
-.recent-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /* Gallery View */
