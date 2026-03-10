@@ -25,25 +25,15 @@ Videlo is a modern web application that leverages AI to transform text descripti
 
 | Feature | Description |
 |---------|-------------|
-| **Text-to-Image** | Generate high-quality images from text prompts using ZImage Turbo and Flux 2 models |
+| **Text-to-Image** | Generate high-quality images from text prompts using Flux 2 Klein and ZImage Turbo models |
 | **Text-to-Video** | Create cinematic videos directly from text descriptions |
 | **Image-to-Video** | Transform static images into dynamic video content |
+| **Image Edit** | AI-powered image editing and style transfer with Qwen Image Edit |
+| **AI Ads Generator** | Complete ad campaign pipeline with automated script, image, and video generation |
 | **Real-time Progress** | Live progress tracking with visual indicators |
 | **Prompt Enhancement** | AI-powered prompt improvement for better results |
 | **Gallery View** | Browse, filter, and manage all your generations |
-| **Credit Tracking** | Monitor your API balance in real-time |
-
----
-
-## Screenshots
-
-<div align="center">
-
-| Home Interface | Gallery View |
-|:--------------:|:------------:|
-| ![Home](docs/screenshots/home.png) | ![Gallery](docs/screenshots/gallery.png) |
-
-</div>
+| **Credit Tracking** | Monitor your API balance (cached for efficiency) |
 
 ---
 
@@ -51,6 +41,7 @@ Videlo is a modern web application that leverages AI to transform text descripti
 
 **Frontend**
 - Vue.js 3 with Composition API
+- Vue Router for SPA navigation
 - Vite for fast development
 - Modern CSS with CSS Variables
 - Axios for API communication
@@ -59,10 +50,11 @@ Videlo is a modern web application that leverages AI to transform text descripti
 - FastAPI for high-performance APIs
 - SQLAlchemy ORM with async support
 - Pydantic for data validation
-- Background task processing
+- Background task processing with polling
 
 **AI Provider**
 - [deAPI](https://deapi.ai) - Decentralized GPU cloud for AI inference
+- iFlow API - For prompt enhancement and LLM tasks
 
 ---
 
@@ -73,10 +65,12 @@ Videlo/
 ├── backend/
 │   ├── app/
 │   │   ├── routes/
-│   │   │   ├── generations.py    # Generation endpoints
-│   │   │   └── prompts.py        # Prompt enhancement
+│   │   │   ├── generations.py    # Generation endpoints (text2img, txt2video, img2video, img2img)
+│   │   │   ├── prompts.py        # Prompt enhancement
+│   │   │   └── ads.py            # AI Ads Generator pipeline
 │   │   ├── services/
-│   │   │   └── deapi.py          # deAPI client
+│   │   │   ├── deapi.py          # deAPI client
+│   │   │   └── ads_pipeline.py   # Ads generation pipeline
 │   │   ├── utils/
 │   │   │   └── security.py       # Security utilities
 │   │   ├── config.py             # App configuration
@@ -90,10 +84,13 @@ Videlo/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── Gallery.vue       # Gallery component
-│   │   │   ├── ImageCard.vue     # Image/video card
-│   │   │   └── ImageModal.vue    # Fullscreen modal
+│   │   │   ├── ImageCard.vue     # Image/video card with actions
+│   │   │   ├── ImageModal.vue    # Fullscreen modal
+│   │   │   └── StatusBadge.vue   # Status indicator
 │   │   ├── views/
-│   │   │   └── Home.vue          # Main view
+│   │   │   ├── Home.vue          # Main generation view
+│   │   │   ├── ImageEdit.vue     # Image editing page
+│   │   │   └── AdGenerator.vue   # AI Ads Generator
 │   │   ├── services/
 │   │   │   └── api.js            # API client
 │   │   ├── App.vue
@@ -113,7 +110,7 @@ Videlo/
 
 - Python 3.11+
 - Node.js 18+
-- deAPI API Key ([Get one here](https://deapi.ai/dashboard))
+- deAPI API Key ([Get one here](https://deapi.ai))
 
 ### Backend Setup
 
@@ -123,12 +120,7 @@ cd backend
 
 # Create virtual environment
 python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -158,7 +150,7 @@ Access the application at `http://localhost:3000`
 
 ---
 
-## API Reference
+## API Endpoints
 
 ### Generation Endpoints
 
@@ -167,6 +159,7 @@ Access the application at `http://localhost:3000`
 | `POST` | `/api/generate/text2img` | Generate image from text |
 | `POST` | `/api/generate/txt2video` | Generate video from text |
 | `POST` | `/api/generate/img2video` | Generate video from image |
+| `POST` | `/api/generate/img2img` | Edit/transform images |
 
 ### Management Endpoints
 
@@ -178,6 +171,16 @@ Access the application at `http://localhost:3000`
 | `GET` | `/api/balance` | Check API balance |
 | `GET` | `/api/models` | List available models |
 
+### AI Ads Generator Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/ads/generate` | Start new ad campaign |
+| `GET` | `/api/ads` | List ad campaigns |
+| `GET` | `/api/ads/{id}` | Get campaign details |
+| `GET` | `/api/ads/{id}/status` | Poll campaign status |
+| `POST` | `/api/ads/{id}/redo` | Redo a specific step |
+
 ### Utility Endpoints
 
 | Method | Endpoint | Description |
@@ -187,6 +190,19 @@ Access the application at `http://localhost:3000`
 | `GET` | `/api/random-prompt` | Get random creative prompt |
 
 Interactive API documentation: `http://localhost:8000/docs`
+
+---
+
+## Routes
+
+| Route | Description |
+|-------|-------------|
+| `/text2img` | Text to Image generation (default) |
+| `/imgedit` | Image editing and style transfer |
+| `/txt2video` | Text to Video generation |
+| `/img2video` | Image to Video generation |
+| `/ads` | AI Ads Generator |
+| `/gallery` | Browse all generations |
 
 ---
 
@@ -242,42 +258,47 @@ Interactive API documentation: `http://localhost:8000/docs`
 
 | Model | Best For | Speed |
 |-------|----------|-------|
-| ZImage Turbo | Photorealistic images | Fast |
-| Flux 2 Klein | High-quality creative images | Medium |
+| Flux 2 Klein | High-quality creative images (default) | Fast |
+| ZImage Turbo | Photorealistic images | Very Fast |
+
+### Image Edit Models
+
+| Model | Best For |
+|-------|----------|
+| Qwen Image Edit | Style transfer and transformations |
+| Flux 2 Klein | General image editing |
 
 ### Video Models
 
 | Model | Best For | Output |
 |-------|----------|--------|
-| LTX-2 19B | Cinematic motion | 1-4 seconds |
+| LTX-2 19B | Cinematic motion (default) | 1-4 seconds |
 | LTX-Video 13B | Smooth animations | 1-4 seconds |
 | Wan 2.1 T2V | Fast video generation | 1-4 seconds |
-| Hunyuan Video | High-quality motion | 1-4 seconds |
+| Hunyuan Video | High-quality videos | 1-4 seconds |
 
 ---
 
-## Contributing
+## AI Ads Generator Pipeline
 
-Contributions are welcome! Here's how you can help:
+The AI Ads Generator automates the entire ad creation process:
 
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
+1. **Prompt Enhancement** - AI improves your ad concept
+2. **Script Generation** - Creates compelling ad script with hook and CTA
+3. **Image Generation** - Produces brand-aligned imagery
+4. **Video Generation** - Transforms image into video ad
+5. **QA Review** - Automated quality assessment with recommendations
 
-Please make sure to update tests as appropriate.
+Each step can be redone with feedback for iterative refinement.
 
 ---
 
-## Roadmap
+## Performance Optimizations
 
-- [ ] WebSocket support for real-time updates
-- [ ] Batch generation
-- [ ] Custom model fine-tuning
-- [ ] Image editing capabilities
-- [ ] Social sharing features
-- [ ] Mobile app
+- **Balance caching**: API balance cached for 5 minutes to reduce unnecessary calls
+- **Optimized polling**: 5-second intervals for status checks
+- **Single refresh**: Consolidated gallery refresh after generation completion
+- **Vue Router**: Client-side navigation for faster page transitions
 
 ---
 
@@ -287,16 +308,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## Acknowledgments
-
-- [deAPI](https://deapi.ai) for providing affordable AI inference
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [Vue.js](https://vuejs.org/) for the reactive frontend framework
-
----
-
 <div align="center">
 
-**Built with care by [abhayror17](https://github.com/abhayror17)**
+**[⬆ Back to Top](#videlo)**
+
+Made with ❤️ by [abhayror17](https://github.com/abhayror17)
 
 </div>
