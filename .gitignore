@@ -54,3 +54,9 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Test/reference images
+*-test-*.jpg
+*-test-*.png
+credit_system.txt
+deapi_models.txt

@@ -11,3 +11,4 @@ psycopg2-binary==2.9.9
 aiohttp==3.10.5
 openai==1.45.0
 python-dotenv==1.0.1
+networkx==3.2.1

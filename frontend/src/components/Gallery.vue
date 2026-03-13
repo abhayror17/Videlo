@@ -1,27 +1,27 @@
 <template>
   <div class="gallery">
     <div class="gallery-header">
-      <h2 class="section-title">Gallery</h2>
+      <h2 class="section-title">{{ $t('gallery.title') }}</h2>
       
       <div class="filter-tabs">
         <button 
           :class="['filter-btn', { active: filterType === 'all' }]"
           @click="setFilter('all')"
-        >All</button>
+        >{{ $t('gallery.all') }}</button>
         <button 
           :class="['filter-btn', { active: filterType === 'text2img' }]"
           @click="setFilter('text2img')"
-        >Images</button>
+        >{{ $t('gallery.images') }}</button>
         <button 
           :class="['filter-btn', { active: filterType === 'img2video' }]"
           @click="setFilter('img2video')"
-        >Videos</button>
+        >{{ $t('gallery.videos') }}</button>
       </div>
     </div>
     
     <div v-if="initialLoad && loading" class="loading-state">
       <div class="loader"></div>
-      <p>Loading...</p>
+      <p>{{ $t('gallery.loading') }}</p>
     </div>
     
     <div v-else-if="generations.length === 0" class="empty-state">
@@ -30,8 +30,8 @@
         <circle cx="8.5" cy="8.5" r="1.5"/>
         <path d="M21 15l-5-5L5 21"/>
       </svg>
-      <p>No creations yet</p>
-      <span>Start generating to see your creations here</span>
+      <p>{{ $t('gallery.noCreationsYet') }}</p>
+      <span>{{ $t('gallery.startGenerating') }}</span>
     </div>
     
     <transition v-else name="fade" mode="out-in">

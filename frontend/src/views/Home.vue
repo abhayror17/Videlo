@@ -11,8 +11,8 @@
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          <p>Click to upload an image</p>
-          <span>or select from Recent below</span>
+          <p>{{ $t('home.clickToUpload') }}</p>
+          <span>{{ $t('home.orSelectFromRecent') }}</span>
           <input 
             ref="mainFileInput"
             type="file" 
@@ -40,7 +40,7 @@
             <circle cx="8.5" cy="8.5" r="1.5"/>
             <path d="M21 15l-5-5L5 21"/>
           </svg>
-          <p>Your creation will appear here</p>
+          <p>{{ $t('home.yourCreationWillAppear') }}</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@
                 class="prompt-action-btn enhance"
                 @click="enhancePrompt"
                 :disabled="!prompt.trim() || enhancing"
-                title="Enhance prompt with AI"
+                :title="$t('home.enhancePrompt')"
               >
                 <svg v-if="!enhancing" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
@@ -75,7 +75,7 @@
                 class="prompt-action-btn random"
                 @click="getRandomPrompt"
                 :disabled="gettingRandom"
-                title="Get random prompt"
+                :title="$t('home.getRandomPrompt')"
               >
                 <div v-if="gettingRandom" class="spinner-small"></div>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -88,29 +88,37 @@
                 </svg>
               </button>
             </div>
-            <button
-              @click="handleGenerate"
-              :disabled="!prompt.trim() || generating"
-              class="generate-btn"
-            >
-              <span v-if="generating" class="btn-content">
-                <span class="spinner"></span>
-                <span>Generating...</span>
-              </span>
-              <span v-else class="btn-content">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            <div class="generate-btn-wrapper">
+              <button
+                @click="handleGenerate"
+                :disabled="!prompt.trim() || generating"
+                class="generate-btn"
+              >
+                <span v-if="generating" class="btn-content">
+                  <span class="spinner"></span>
+                  <span>{{ $t('home.generating') }}</span>
+                </span>
+                <span v-else class="btn-content">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                  <span>{{ $t('home.generate') }}</span>
+                </span>
+              </button>
+              <div class="credit-badge">
+                <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
                 </svg>
-                <span>Generate</span>
-              </span>
-            </button>
+                <span>{{ mainCredits }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Recent Generations Mini Gallery -->
       <div v-if="recentGenerations.length > 0" class="recent-section">
-        <h3>Recent</h3>
+        <h3>{{ $t('home.recent') }}</h3>
         <div class="recent-grid">
           <ImageCard
             v-for="gen in recentGenerations.slice(0, 4)"
@@ -148,7 +156,7 @@
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
-        <h3>Create Video from Image</h3>
+        <h3>{{ $t('home.createVideoFromImage') }}</h3>
         
         <div class="preview-section">
           <img 
@@ -165,8 +173,8 @@
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <p>Click to upload an image</p>
-            <span>or select one from the gallery</span>
+            <p>{{ $t('home.clickToUpload') }}</p>
+            <span>{{ $t('home.orSelectFromRecent') }}</span>
           </div>
           <input 
             ref="fileInput"
@@ -179,47 +187,56 @@
         
         <textarea
           v-model="videoPrompt"
-          placeholder="Describe the video animation..."
+          :placeholder="$t('home.describeVideoAnimation')"
           rows="3"
           class="modal-textarea"
         ></textarea>
         
         <div class="modal-options">
           <div class="modal-option">
-            <label>Model</label>
+            <label>{{ $t('settings.model') }}</label>
             <select v-model="videoModel">
+              <option value="Ltx2_3_22B_Dist_INT8">LTX-2.3 22B (Recommended)</option>
               <option value="Ltx2_19B_Dist_FP8">LTX-2 19B</option>
               <option value="Ltxv_13B_0_9_8_Distilled_FP8">LTX-Video 13B</option>
             </select>
           </div>
           <div class="modal-option">
-            <label>Duration</label>
+            <label>{{ $t('settings.duration') }}</label>
             <select v-model.number="videoFrames">
-              <option :value="24">1 second</option>
-              <option :value="48">2 seconds</option>
-              <option :value="72">3 seconds</option>
-              <option :value="96">4 seconds</option>
+              <option :value="49">~2 {{ $t('settings.seconds') }}</option>
+              <option :value="120">~5 {{ $t('settings.seconds') }}</option>
+              <option :value="241">~10 {{ $t('settings.seconds') }}</option>
             </select>
           </div>
         </div>
         
-        <button
-          @click="createVideo"
-          :disabled="!videoPrompt.trim() || creatingVideo"
-          class="modal-generate-btn"
-        >
-          <span v-if="creatingVideo" class="btn-content">
-            <span class="spinner"></span>
-            <span>Creating...</span>
-          </span>
-          <span v-else>Generate Video</span>
-        </button>
+        <div class="modal-generate-wrapper">
+          <button
+            @click="createVideo"
+            :disabled="!videoPrompt.trim() || creatingVideo"
+            class="modal-generate-btn"
+          >
+            <span v-if="creatingVideo" class="btn-content">
+              <span class="spinner"></span>
+              <span>{{ $t('home.creating') }}</span>
+            </span>
+            <span v-else>{{ $t('home.generateVideo') }}</span>
+          </button>
+          <div class="credit-badge">
+            <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
+            </svg>
+            <span>{{ videoCredits }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import { useI18n } from 'vue-i18n'
 import Gallery from '../components/Gallery.vue'
 import ImageCard from '../components/ImageCard.vue'
 import ImageModal from '../components/ImageModal.vue'
@@ -242,6 +259,10 @@ export default {
       default: () => ({})
     }
   },
+  setup() {
+    const { t } = useI18n()
+    return { t }
+  },
   data() {
     return {
       prompt: '',
@@ -260,8 +281,8 @@ export default {
       uploadedImageFile: null,
       uploadedImagePreview: null,
       videoPrompt: '',
-      videoModel: 'Ltx2_19B_Dist_FP8',
-      videoFrames: 96,
+      videoModel: 'Ltx2_3_22B_Dist_INT8',
+      videoFrames: 120,
       videoFps: 24,
       creatingVideo: false
     }
@@ -269,11 +290,80 @@ export default {
   computed: {
     placeholderText() {
       if (this.currentView === 'text2img') {
-        return 'Describe the image you want to create...'
+        return this.t('home.describeImage')
       } else if (this.currentView === 'txt2video') {
-        return 'Describe the video you want to generate...'
+        return this.t('home.describeVideo')
       }
-      return 'Describe the transformation...'
+      return this.t('home.describeTransformation')
+    },
+    videoCredits() {
+      const videoCredits = {
+        'Ltx2_3_22B_Dist_INT8': { '512x512x49': 8, '768x768x120': 20, '1024x1024x120': 30, '768x768x241': 35, '1024x1024x241': 50 },
+        'Ltx2_19B_Dist_FP8': { '512x512x49': 12, '768x768x120': 80, '1024x1024x120': 120, '768x768x241': 140 },
+        'Ltxv_13B_0_9_8_Distilled_FP8': { '512x512x30': 5, '512x512x60': 8, '512x512x120': 12, '768x768x120': 20 }
+      }
+      
+      const model = this.videoModel
+      const frames = this.videoFrames
+      const pricing = videoCredits[model] || videoCredits['Ltx2_3_22B_Dist_INT8']
+      
+      let bestMatch = 20
+      for (const [key, credits] of Object.entries(pricing)) {
+        const [w, h, f] = key.split('x').map(Number)
+        if (frames <= f) {
+          if (credits < bestMatch) bestMatch = credits
+        }
+      }
+      return bestMatch
+    },
+    mainCredits() {
+      // Credit pricing tables
+      const txt2imgCredits = {
+        'Flux1schnell': { 512: 4, 768: 5, 1024: 8, 1536: 12, 2048: 18 },
+        'Flux_2_Klein_4B_BF16': { 512: 5, 768: 8, 1024: 10, 1536: 15 },
+        'ZImageTurbo_INT8': { 512: 8, 768: 12, 1024: 20, 1536: 30, 2048: 45 }
+      }
+      const videoCredits = {
+        'Ltx2_3_22B_Dist_INT8': { '512x512x49': 8, '768x768x120': 20, '1024x1024x120': 30, '768x768x241': 35, '1024x1024x241': 50 },
+        'Ltx2_19B_Dist_FP8': { '512x512x49': 12, '768x768x120': 80, '1024x1024x120': 120, '768x768x241': 140 },
+        'Ltxv_13B_0_9_8_Distilled_FP8': { '512x512x30': 5, '512x512x60': 8, '512x512x120': 12, '768x768x120': 20 }
+      }
+      
+      const opts = this.generationOptions || {}
+      const model = opts.model || 'Flux_2_Klein_4B_BF16'
+      const width = opts.width || 1024
+      const height = opts.height || 576
+      const frames = opts.frames || 49
+      const maxDim = Math.max(width, height)
+      
+      if (this.currentView === 'txt2video') {
+        const pricing = videoCredits[model] || videoCredits['Ltx2_3_22B_Dist_INT8']
+        let bestMatch = 20
+        for (const [key, credits] of Object.entries(pricing)) {
+          const [w, h, f] = key.split('x').map(Number)
+          if (frames <= f) {
+            if (credits < bestMatch) bestMatch = credits
+          }
+        }
+        return bestMatch
+      } else if (this.currentView === 'img2video') {
+        const pricing = videoCredits[model] || videoCredits['Ltx2_3_22B_Dist_INT8']
+        let bestMatch = 20
+        for (const [key, credits] of Object.entries(pricing)) {
+          const [w, h, f] = key.split('x').map(Number)
+          if (frames <= f) {
+            if (credits < bestMatch) bestMatch = credits
+          }
+        }
+        return bestMatch
+      } else {
+        // text2img
+        const pricing = txt2imgCredits[model] || txt2imgCredits['Flux_2_Klein_4B_BF16']
+        for (const [dim, credits] of Object.entries(pricing)) {
+          if (maxDim <= parseInt(dim)) return credits
+        }
+        return 15
+      }
     }
   },
   watch: {
@@ -347,7 +437,7 @@ export default {
       
       // For img2video, require an image
       if (this.currentView === 'img2video' && !this.uploadedImageFile && !this.selectedImage) {
-        alert('Please upload an image or select one from Recent')
+        alert(this.t('home.pleaseUploadImage'))
         return
       }
       
@@ -388,7 +478,7 @@ export default {
         }
       } catch (error) {
         console.error('Generation failed:', error)
-        alert('Failed to generate. Please try again.')
+        alert(this.t('home.failedToGenerate'))
       } finally {
         this.generating = false
       }
@@ -480,7 +570,7 @@ export default {
       const file = event.target.files[0]
       if (!file) return
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file')
+        alert(this.t('imageEdit.pleaseSelectImage'))
         return
       }
       this.uploadedImageFile = file
@@ -491,7 +581,7 @@ export default {
       const file = event.target.files[0]
       if (!file) return
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file')
+        alert(this.t('imageEdit.pleaseSelectImage'))
         return
       }
       this.uploadedImageFile = file
@@ -522,7 +612,7 @@ export default {
     async createVideo() {
       if (!this.videoPrompt.trim() || this.creatingVideo) return
       if (!this.selectedImage && !this.uploadedImageFile) {
-        alert('Please select an image')
+        alert(this.t('home.pleaseSelectImage'))
         return
       }
 
@@ -561,7 +651,7 @@ export default {
         this.refreshAll()
       } catch (error) {
         console.error('Video generation failed:', error)
-        alert('Failed to generate video.')
+        alert(this.t('home.failedToGenerateVideo'))
       } finally {
         this.creatingVideo = false
       }
@@ -744,6 +834,31 @@ export default {
 .prompt-action-btn.random:disabled {
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.3);
+}
+
+.generate-btn-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.credit-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #22C55E;
+  white-space: nowrap;
+}
+
+.credit-badge .credit-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .generate-btn {
@@ -999,6 +1114,62 @@ export default {
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.8125rem;
+}
+
+.modal-credit-estimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.modal-credit-estimate .credit-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.modal-credit-estimate .credit-icon {
+  width: 16px;
+  height: 16px;
+  color: #22C55E;
+}
+
+.modal-credit-estimate .credit-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #22C55E;
+}
+
+.modal-generate-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-generate-wrapper .credit-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #22C55E;
+  white-space: nowrap;
+}
+
+.modal-generate-wrapper .credit-badge .credit-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .modal-generate-btn {

@@ -8,6 +8,15 @@ const api = axios.create({
   timeout: 30000
 })
 
+// Add custom API key header if user has provided one (BYOK)
+api.interceptors.request.use(config => {
+  const customKey = localStorage.getItem('deapi_key')
+  if (customKey) {
+    config.headers['X-DeAPI-Key'] = customKey
+  }
+  return config
+})
+
 export default {
   // Text-to-Image generation
   async generateText2Img(prompt, options = {}) {
@@ -28,7 +37,7 @@ export default {
   async generateTxt2Video(prompt, options = {}) {
     const response = await api.post('/generate/txt2video', {
       prompt,
-      model: options.model || 'Ltxv_13B_0_9_8_Distilled_FP8',
+      model: options.model || 'Ltx2_3_22B_Dist_INT8',
       width: options.width || 512,
       height: options.height || 512,
       guidance: options.guidance ?? 3.5,
@@ -45,7 +54,7 @@ export default {
     const formData = new FormData()
     formData.append('generation_id', generationId)
     formData.append('prompt', prompt)
-    formData.append('model', options.model || 'Ltx2_19B_Dist_FP8')
+    formData.append('model', options.model || 'Ltx2_3_22B_Dist_INT8')
     formData.append('width', options.width || 512)
     formData.append('height', options.height || 512)
     formData.append('guidance', options.guidance ?? 3.5)
@@ -68,7 +77,7 @@ export default {
     const formData = new FormData()
     formData.append('first_frame', imageFile)
     formData.append('prompt', prompt)
-    formData.append('model', options.model || 'Ltx2_19B_Dist_FP8')
+    formData.append('model', options.model || 'Ltx2_3_22B_Dist_INT8')
     formData.append('width', options.width || 512)
     formData.append('height', options.height || 512)
     formData.append('guidance', options.guidance ?? 3.5)
@@ -228,6 +237,129 @@ export default {
       step,
       feedback
     })
+    return response.data
+  },
+
+  // Text-to-Speech API
+  async generateTxt2Audio(text, options = {}) {
+    const formData = new FormData()
+    formData.append('text', text)
+    formData.append('model', options.model || 'Kokoro')
+    formData.append('lang', options.lang || 'en-us')
+    formData.append('speed', options.speed || 1)
+    formData.append('format', options.format || 'flac')
+    formData.append('sample_rate', options.sampleRate || 24000)
+    formData.append('mode', options.mode || 'custom_voice')
+    
+    if (options.voice) {
+      formData.append('voice', options.voice)
+    }
+    if (options.refAudio) {
+      formData.append('ref_audio', options.refAudio)
+    }
+    if (options.refText) {
+      formData.append('ref_text', options.refText)
+    }
+    if (options.instruct) {
+      formData.append('instruct', options.instruct)
+    }
+
+    const response = await api.post('/generate/txt2audio', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      timeout: 60000
+    })
+    return response.data
+  },
+
+  // Graph/Workflow execution APIs
+  async executeGraph(graphData) {
+    const response = await api.post('/workflow/execute', graphData, {
+      timeout: 30000
+    })
+    return response.data
+  },
+
+  // Get graph execution status
+  async getGraphExecution(executionId) {
+    const response = await api.get(`/workflow/executions/${executionId}`)
+    return response.data
+  },
+
+  // Save workflow
+  async saveWorkflow(name, nodes, edges, description = null) {
+    const response = await api.post('/workflow/save', {
+      name,
+      description,
+      nodes,
+      edges
+    })
+    return response.data
+  },
+
+  // List saved workflows
+  async listWorkflows() {
+    const response = await api.get('/workflow/saved')
+    return response.data
+  },
+
+  // Get saved workflow
+  async getWorkflow(workflowId) {
+    const response = await api.get(`/workflow/saved/${workflowId}`)
+    return response.data
+  },
+
+  // Update workflow
+  async updateWorkflow(workflowId, name, nodes, edges, description = null) {
+    const response = await api.put(`/workflow/saved/${workflowId}`, {
+      name,
+      description,
+      nodes,
+      edges
+    })
+    return response.data
+  },
+
+  // Delete workflow
+  async deleteWorkflow(workflowId) {
+    const response = await api.delete(`/workflow/saved/${workflowId}`)
+    return response.data
+  },
+
+  // ============================================================
+  // CREDIT SYSTEM APIs
+  // ============================================================
+
+  // Check credits for a generation
+  async checkCredits(generationType, model, options = {}) {
+    const response = await api.post('/credits/check', {
+      generation_type: generationType,
+      model: model,
+      width: options.width,
+      height: options.height,
+      frames: options.frames,
+      text_length: options.textLength,
+      duration: options.duration
+    })
+    return response.data
+  },
+
+  // Get user's credit balance
+  async getCreditBalance() {
+    const response = await api.get('/credits/balance')
+    return response.data
+  },
+
+  // Get available credit packages
+  async getCreditPackages() {
+    const response = await api.get('/credits/packages')
+    return response.data
+  },
+
+  // Add demo credits (for testing)
+  async addDemoCredits() {
+    const response = await api.post('/credits/add-demo')
     return response.data
   }
 }

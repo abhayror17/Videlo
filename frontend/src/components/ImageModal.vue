@@ -21,7 +21,7 @@
             <polyline points="7 10 12 15 17 10"/>
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
-          <span>Download</span>
+          <span>{{ $t('imageModal.download') }}</span>
         </a>
         
         <div class="media-container" @click.self="$emit('close')">
@@ -47,7 +47,7 @@
               <line x1="15" y1="9" x2="9" y2="15"/>
               <line x1="9" y1="9" x2="15" y2="15"/>
             </svg>
-            <span>Media not available</span>
+            <span>{{ $t('imageModal.mediaNotAvailable') }}</span>
           </div>
         </div>
         

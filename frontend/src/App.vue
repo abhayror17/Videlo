@@ -15,28 +15,28 @@
         
         <nav class="nav-menu">
           <div class="nav-section">
-            <span class="nav-section-title">Generate</span>
+            <span class="nav-section-title">{{ $t('nav.generate') }}</span>
             <router-link to="/text2img" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <path d="M21 15l-5-5L5 21"/>
               </svg>
-              <span>Text to Image</span>
+              <span>{{ $t('nav.text2img') }}</span>
             </router-link>
             <router-link to="/imgedit" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
-              <span>Image Edit</span>
+              <span>{{ $t('nav.imgedit') }}</span>
             </router-link>
             <router-link to="/txt2video" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="4" width="20" height="16" rx="2"/>
                 <path d="M10 9l5 3-5 3V9z"/>
               </svg>
-              <span>Text to Video</span>
+              <span>{{ $t('nav.txt2video') }}</span>
             </router-link>
             <router-link to="/img2video" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -45,7 +45,7 @@
                 <path d="M21 15l-5-5L5 21"/>
                 <path d="M17 11l4 4-4 4"/>
               </svg>
-              <span>Image to Video</span>
+              <span>{{ $t('nav.img2video') }}</span>
             </router-link>
             <router-link to="/ads" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -54,12 +54,12 @@
                 <circle cx="17" cy="7" r="2"/>
                 <path d="M17 7l2-2"/>
               </svg>
-              <span>AI Ads Generator</span>
+              <span>{{ $t('nav.ads') }}</span>
             </router-link>
           </div>
           
           <div class="nav-section">
-            <span class="nav-section-title">Library</span>
+            <span class="nav-section-title">{{ $t('nav.library') }}</span>
             <router-link to="/gallery" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7" rx="1"/>
@@ -67,14 +67,25 @@
                 <rect x="3" y="14" width="7" height="7" rx="1"/>
                 <rect x="14" y="14" width="7" height="7" rx="1"/>
               </svg>
-              <span>Gallery</span>
+              <span>{{ $t('nav.gallery') }}</span>
+            </router-link>
+            <router-link to="/workflow" class="nav-item" active-class="active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <path d="M14 17h3v3"/>
+                <path d="M17 17l-4 4"/>
+                <path d="M21 17v3a1 1 0 01-1 1h-3"/>
+              </svg>
+              <span>{{ $t('nav.workflow') }}</span>
             </router-link>
           </div>
         </nav>
         
         <div class="sidebar-footer">
           <div class="api-balance">
-            <span class="balance-label">Credits</span>
+            <span class="balance-label">{{ $t('nav.credits') }}</span>
             <span class="balance-value">{{ balance !== null ? '$' + balance.toFixed(2) : '--' }}</span>
           </div>
         </div>
@@ -85,14 +96,15 @@
         <!-- Top Header -->
         <header class="top-header">
           <div class="breadcrumbs">
-            <span class="breadcrumb-item">Home</span>
+            <span class="breadcrumb-item">{{ $t('header.home') }}</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
             <span class="breadcrumb-item active">{{ currentRouteTitle }}</span>
           </div>
           <div class="header-actions">
-            <button class="icon-btn" title="Settings">
+            <LanguageSwitcher />
+            <button class="icon-btn" :title="$t('header.settings')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -102,7 +114,7 @@
         </header>
 
         <!-- Page Content -->
-        <div class="page-content">
+        <div class="page-content" :class="{ 'workflow-page': $route.name === 'workflow' }">
           <router-view 
             ref="pageComponent"
             :current-view="currentMode"
@@ -118,27 +130,28 @@
           <button 
             :class="['tab', { active: settingsTab === 'form' }]"
             @click="settingsTab = 'form'"
-          >Form</button>
+          >{{ $t('settings.form') }}</button>
           <button 
             :class="['tab', { active: settingsTab === 'json' }]"
             @click="settingsTab = 'json'"
-          >JSON</button>
+          >{{ $t('settings.json') }}</button>
         </div>
 
         <div v-if="settingsTab === 'form'" class="settings-form">
           <!-- Model Selection -->
           <div class="setting-group">
-            <label>Model</label>
+            <label>{{ $t('settings.model') }}</label>
             <select v-model="generationOptions.model" class="setting-select">
-              <optgroup v-if="currentMode === 'text2img'" label="Image Models">
+              <optgroup v-if="currentMode === 'text2img'" :label="$t('settings.imageModels')">
                 <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
                 <option value="ZImageTurbo_INT8">ZImage Turbo</option>
               </optgroup>
-              <optgroup v-else-if="currentMode === 'imgedit'" label="Image Edit Models">
+              <optgroup v-else-if="currentMode === 'imgedit'" :label="$t('settings.imageEditModels')">
                 <option value="QwenImageEdit_Plus_NF4">Qwen Image Edit</option>
                 <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
               </optgroup>
-              <optgroup v-else label="Video Models">
+              <optgroup v-else :label="$t('settings.videoModels')">
+                <option value="Ltx2_3_22B_Dist_INT8">LTX-2.3 22B (Recommended)</option>
                 <option value="Ltx2_19B_Dist_FP8">LTX-2 19B</option>
                 <option value="Ltxv_13B_0_9_8_Distilled_FP8">LTX-Video 13B</option>
                 <option value="Wan2_1_14B_T2V_BF16">Wan 2.1 T2V</option>
@@ -149,7 +162,7 @@
 
           <!-- Dimensions (hide for imgedit) -->
           <div v-if="currentMode !== 'imgedit'" class="setting-group">
-            <label>Dimensions</label>
+            <label>{{ $t('settings.dimensions') }}</label>
             <div class="dimension-inputs">
               <div class="dim-input">
                 <input 
@@ -185,7 +198,7 @@
           <!-- Steps -->
           <div class="setting-group">
             <div class="setting-header">
-              <label>Steps</label>
+              <label>{{ $t('settings.steps') }}</label>
               <span class="setting-value">{{ generationOptions.steps }}</span>
             </div>
             <input 
@@ -197,18 +210,18 @@
               class="setting-slider"
             >
             <div v-else class="steps-fixed">
-              <span class="fixed-label">Fixed at 4 for Flux 2</span>
+              <span class="fixed-label">{{ $t('settings.fixedAtFlux') }}</span>
             </div>
             <div class="slider-labels" v-if="generationOptions.model !== 'Flux_2_Klein_4B_BF16'">
-              <span>Fast</span>
-              <span>Quality</span>
+              <span>{{ $t('settings.fast') }}</span>
+              <span>{{ $t('settings.quality') }}</span>
             </div>
           </div>
 
           <!-- Guidance -->
           <div class="setting-group">
             <div class="setting-header">
-              <label>Guidance Scale</label>
+              <label>{{ $t('settings.guidanceScale') }}</label>
               <span class="setting-value">{{ generationOptions.guidance }}</span>
             </div>
             <input 
@@ -223,15 +236,15 @@
 
           <!-- Seed -->
           <div class="setting-group">
-            <label>Seed</label>
+            <label>{{ $t('settings.seed') }}</label>
             <div class="seed-input-wrapper">
               <input 
                 type="number" 
                 v-model.number="generationOptions.seed"
-                placeholder="Random"
+                :placeholder="$t('settings.random')"
                 class="setting-input"
               >
-              <button class="seed-random-btn" @click="generationOptions.seed = -1" title="Random seed">
+              <button class="seed-random-btn" @click="generationOptions.seed = -1" :title="$t('settings.random')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="2" y="2" width="8" height="8" rx="1"/>
                   <rect x="14" y="2" width="8" height="8" rx="1"/>
@@ -252,24 +265,38 @@
             <div class="setting-divider"></div>
             
             <div class="setting-group">
-              <label>Duration</label>
+              <label>{{ $t('settings.duration') }}</label>
               <select v-model.number="generationOptions.frames" class="setting-select">
-                <option :value="24">1 second</option>
-                <option :value="48">2 seconds</option>
-                <option :value="72">3 seconds</option>
-                <option :value="96">4 seconds</option>
+                <option :value="49">~2 {{ $t('settings.seconds') }}</option>
+                <option :value="120">~5 {{ $t('settings.seconds') }}</option>
+                <option :value="241">~10 {{ $t('settings.seconds') }}</option>
               </select>
             </div>
 
             <div class="setting-group">
-              <label>FPS</label>
+              <label>{{ $t('settings.fps') }}</label>
               <select v-model.number="generationOptions.fps" class="setting-select">
                 <option :value="24">24 FPS</option>
-                <option :value="30">30 FPS</option>
-                <option :value="60">60 FPS</option>
               </select>
             </div>
           </template>
+          
+          <!-- Credit Estimate -->
+          <div class="setting-divider"></div>
+          <div class="credit-estimate">
+            <div class="credit-row">
+              <span class="credit-label">
+                <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
+                </svg>
+                {{ $t('credits.estimated') }}
+              </span>
+              <span class="credit-value">{{ estimatedCredits }} {{ $t('credits.credits') }}</span>
+            </div>
+            <p class="credit-hint" v-if="currentMode === 'txt2video' || currentMode === 'img2video'">
+              {{ $t('credits.videoHint') }}
+            </p>
+          </div>
         </div>
 
         <!-- JSON Tab -->
@@ -282,10 +309,19 @@
 </template>
 
 <script>
+import { useI18n } from 'vue-i18n'
 import api from './services/api.js'
+import LanguageSwitcher from './components/LanguageSwitcher.vue'
 
 export default {
   name: 'App',
+  components: {
+    LanguageSwitcher
+  },
+  setup() {
+    const { t } = useI18n()
+    return { t }
+  },
   data() {
     return {
       settingsTab: 'form',
@@ -297,7 +333,7 @@ export default {
         steps: 4,
         guidance: 3.5,
         seed: -1,
-        frames: 48,
+        frames: 49,
         fps: 24
       }
     }
@@ -307,11 +343,12 @@ export default {
       return this.$route.meta.mode || this.$route.name
     },
     currentRouteTitle() {
-      return this.$route.meta.title || 'Generate'
+      const titleKey = this.$route.meta.title
+      return titleKey ? this.t(titleKey) : this.t('nav.generate')
     },
     showSettingsPanel() {
-      // Hide settings for ads (uses internal pipeline) and gallery
-      return !['ads', 'gallery'].includes(this.$route.name)
+      // Hide settings for ads (uses internal pipeline), gallery, and workflow
+      return !['ads', 'gallery', 'workflow'].includes(this.$route.name)
     },
     aspectPresets() {
       return [
@@ -326,6 +363,56 @@ export default {
       const h = this.generationOptions.height
       const preset = this.aspectPresets.find(p => p.width === w && p.height === h)
       return preset?.label || null
+    },
+    estimatedCredits() {
+      // Credit pricing tables
+      const txt2imgCredits = {
+        'Flux1schnell': { 512: 4, 768: 5, 1024: 8, 1536: 12, 2048: 18 },
+        'Flux_2_Klein_4B_BF16': { 512: 5, 768: 8, 1024: 10, 1536: 15 },
+        'ZImageTurbo_INT8': { 512: 8, 768: 12, 1024: 20, 1536: 30, 2048: 45 }
+      }
+      const videoCredits = {
+        'Ltx2_3_22B_Dist_INT8': { '512x512x49': 8, '768x768x120': 20, '1024x1024x120': 30, '768x768x241': 35, '1024x1024x241': 50 },
+        'Ltx2_19B_Dist_FP8': { '512x512x49': 12, '768x768x120': 80, '1024x1024x120': 120, '768x768x241': 140 },
+        'Ltxv_13B_0_9_8_Distilled_FP8': { '512x512x30': 5, '512x512x60': 8, '512x512x120': 12, '768x768x120': 20 }
+      }
+      const img2imgCredits = {
+        'QwenImageEdit_Plus_NF4': { 512: 40, 768: 70, 1024: 100 },
+        'Flux_2_Klein_4B_BF16': { 768: 12, 1024: 16, 1536: 25 }
+      }
+      
+      const model = this.generationOptions.model
+      const width = this.generationOptions.width
+      const height = this.generationOptions.height
+      const maxDim = Math.max(width, height)
+      
+      if (this.currentMode === 'txt2video' || this.currentMode === 'img2video') {
+        const frames = this.generationOptions.frames || 49
+        const pricing = videoCredits[model] || videoCredits['Ltx2_3_22B_Dist_INT8']
+        
+        // Find best match
+        let bestMatch = 20
+        for (const [key, credits] of Object.entries(pricing)) {
+          const [w, h, f] = key.split('x').map(Number)
+          if (width <= w && height <= h && frames <= f) {
+            if (credits < bestMatch) bestMatch = credits
+          }
+        }
+        return bestMatch
+      } else if (this.currentMode === 'imgedit') {
+        const pricing = img2imgCredits[model] || img2imgCredits['QwenImageEdit_Plus_NF4']
+        for (const [dim, credits] of Object.entries(pricing)) {
+          if (maxDim <= parseInt(dim)) return credits
+        }
+        return 100
+      } else {
+        // text2img
+        const pricing = txt2imgCredits[model] || txt2imgCredits['Flux_2_Klein_4B_BF16']
+        for (const [dim, credits] of Object.entries(pricing)) {
+          if (maxDim <= parseInt(dim)) return credits
+        }
+        return 15
+      }
     }
   },
   watch: {
@@ -334,7 +421,7 @@ export default {
       if (mode === 'text2img') {
         this.generationOptions.model = 'Flux_2_Klein_4B_BF16'
       } else if (mode === 'txt2video' || mode === 'img2video') {
-        this.generationOptions.model = 'Ltx2_19B_Dist_FP8'
+        this.generationOptions.model = 'Ltx2_3_22B_Dist_INT8'
       } else if (mode === 'imgedit') {
         this.generationOptions.model = 'QwenImageEdit_Plus_NF4'
       }
@@ -422,13 +509,15 @@ body {
 }
 
 #app {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* App Layout */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Left Sidebar */
@@ -549,6 +638,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: hidden;
 }
 
 /* Top Header */
@@ -585,6 +675,7 @@ body {
 .header-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .icon-btn {
@@ -617,7 +708,15 @@ body {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg-base);
+  min-height: 0;
+}
+
+/* Workflow page gets zero padding so canvas fills full area */
+.page-content.workflow-page {
+  padding: 0;
+  overflow: hidden;
 }
 
 /* Right Settings Panel */
@@ -880,6 +979,47 @@ body {
   height: 1px;
   background: var(--border-color);
   margin: 20px 0;
+}
+
+/* Credit Estimate */
+.credit-estimate {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.credit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.credit-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.credit-icon {
+  width: 18px;
+  height: 18px;
+  color: #22C55E;
+}
+
+.credit-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #22C55E;
+}
+
+.credit-hint {
+  margin: 10px 0 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 /* JSON Tab */

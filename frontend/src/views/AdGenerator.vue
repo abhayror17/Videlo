@@ -12,7 +12,7 @@
             <circle cx="17" cy="7" r="2"/>
             <path d="M17 7l2-2"/>
           </svg>
-          <p>Your ad campaign will appear here</p>
+          <p>{{ $t('ads.yourAdCampaignWillAppear') }}</p>
         </div>
 
         <!-- Campaign in progress: show pipeline -->
@@ -27,7 +27,7 @@
                 </svg>
                 <span v-else>1</span>
               </div>
-              <span class="step-label">Enhance</span>
+              <span class="step-label">{{ $t('ads.enhance') }}</span>
             </div>
 
             <!-- Step 2: Script -->
@@ -38,7 +38,7 @@
                 </svg>
                 <span v-else>2</span>
               </div>
-              <span class="step-label">Script</span>
+              <span class="step-label">{{ $t('ads.script') }}</span>
             </div>
 
             <!-- Step 3: Image -->
@@ -49,7 +49,7 @@
                 </svg>
                 <span v-else>3</span>
               </div>
-              <span class="step-label">Image</span>
+              <span class="step-label">{{ $t('ads.image') }}</span>
             </div>
 
             <!-- Step 4: Video -->
@@ -60,7 +60,7 @@
                 </svg>
                 <span v-else>4</span>
               </div>
-              <span class="step-label">Video</span>
+              <span class="step-label">{{ $t('ads.video') }}</span>
             </div>
 
             <!-- Step 5: QA -->
@@ -75,7 +75,7 @@
                 </svg>
                 <span v-else>5</span>
               </div>
-              <span class="step-label">QA</span>
+              <span class="step-label">{{ $t('ads.qa') }}</span>
             </div>
           </div>
 
@@ -84,13 +84,13 @@
             <!-- Enhancement -->
             <div v-if="campaign.current_step === 'enhancing'" class="step-content processing">
               <div class="spinner-large"></div>
-              <p>Enhancing your concept...</p>
+              <p>{{ $t('ads.enhancingConcept') }}</p>
             </div>
 
             <!-- Script -->
             <div v-else-if="campaign.script && campaign.current_step === 'script'" class="step-content">
               <div class="script-preview">
-                <label>Ad Script</label>
+                <label>{{ $t('ads.adScript') }}</label>
                 <p>{{ parsedScript?.script || campaign.script }}</p>
               </div>
             </div>
@@ -101,7 +101,7 @@
             </div>
             <div v-else-if="campaign.image_status === 'processing'" class="step-content processing">
               <div class="spinner-large"></div>
-              <p>Generating brand image...</p>
+              <p>{{ $t('ads.generatingBrandImage') }}</p>
             </div>
 
             <!-- Video -->
@@ -110,14 +110,14 @@
             </div>
             <div v-else-if="campaign.video_status === 'processing'" class="step-content processing">
               <div class="spinner-large"></div>
-              <p>Generating video ad...</p>
-              <span class="progress-note">This may take a few minutes</span>
+              <p>{{ $t('ads.generatingVideoAd') }}</p>
+              <span class="progress-note">{{ $t('ads.mayTakeFewMinutes') }}</span>
             </div>
 
             <!-- QA -->
             <div v-else-if="campaign.qa_status === 'processing'" class="step-content processing">
               <div class="spinner-large"></div>
-              <p>Running QA analysis...</p>
+              <p>{{ $t('ads.runningQA') }}</p>
             </div>
 
             <!-- Completed -->
@@ -127,7 +127,7 @@
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                   <polyline points="22 4 12 14.01 9 11.01"/>
                 </svg>
-                <h3>Campaign Complete!</h3>
+                <h3>{{ $t('ads.campaignComplete') }}</h3>
               </div>
               <video v-if="campaign.video_url" :src="campaign.video_url" controls muted loop class="generated-video"></video>
               <div class="completed-actions">
@@ -137,7 +137,7 @@
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
-                  Download Video
+                  {{ $t('ads.downloadVideo') }}
                 </button>
               </div>
             </div>
@@ -172,40 +172,48 @@
               <input
                 v-model="brandName"
                 type="text"
-                placeholder="Brand name (optional)"
+                :placeholder="$t('ads.brandName')"
                 class="brand-input"
               />
             </div>
-            <button
-              @click="campaign ? resetCampaign() : startCampaign()"
-              :disabled="!userPrompt.trim() && !campaign"
-              class="generate-btn"
-            >
-              <span v-if="creating || (campaign && campaign.overall_status === 'processing')" class="btn-content">
-                <span class="spinner"></span>
-                <span>{{ creating ? 'Starting...' : 'Processing...' }}</span>
-              </span>
-              <span v-else-if="campaign" class="btn-content">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="19" y1="12" x2="5" y2="12"/>
-                  <polyline points="12 19 5 12 12 5"/>
+            <div class="generate-btn-wrapper">
+              <button
+                @click="campaign ? resetCampaign() : startCampaign()"
+                :disabled="!userPrompt.trim() && !campaign"
+                class="generate-btn"
+              >
+                <span v-if="creating || (campaign && campaign.overall_status === 'processing')" class="btn-content">
+                  <span class="spinner"></span>
+                  <span>{{ creating ? $t('ads.starting') : $t('ads.processing') }}</span>
+                </span>
+                <span v-else-if="campaign" class="btn-content">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                  </svg>
+                  <span>{{ $t('ads.newCampaign') }}</span>
+                </span>
+                <span v-else class="btn-content">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                  <span>{{ $t('ads.generateAd') }}</span>
+                </span>
+              </button>
+              <div class="credit-badge" v-if="!campaign">
+                <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
                 </svg>
-                <span>New Campaign</span>
-              </span>
-              <span v-else class="btn-content">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-                <span>Generate Ad</span>
-              </span>
-            </button>
+                <span>{{ adCredits }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Recent Campaigns -->
       <div v-if="previousCampaigns.length > 0 && !campaign" class="recent-section">
-        <h3>Previous Campaigns</h3>
+        <h3>{{ $t('ads.previousCampaigns') }}</h3>
         <div class="recent-grid">
           <div
             v-for="camp in previousCampaigns.slice(0, 4)"
@@ -222,7 +230,7 @@
               </svg>
             </div>
             <div class="card-info">
-              <span class="card-brand">{{ camp.brand_name || 'No Brand' }}</span>
+              <span class="card-brand">{{ camp.brand_name || $t('ads.noBrand') }}</span>
               <span class="card-prompt">{{ camp.user_prompt.substring(0, 40) }}...</span>
             </div>
           </div>
@@ -233,6 +241,7 @@
 </template>
 
 <script>
+import { useI18n } from 'vue-i18n'
 import api from '../services/api.js'
 
 export default {
@@ -242,6 +251,10 @@ export default {
       type: Object,
       default: () => ({})
     }
+  },
+  setup() {
+    const { t } = useI18n()
+    return { t }
   },
   data() {
     return {
@@ -257,9 +270,9 @@ export default {
   computed: {
     promptPlaceholder() {
       if (this.campaign) {
-        return 'Start a new campaign...'
+        return this.t('ads.describeAdConcept')
       }
-      return 'Describe your ad concept... e.g., "A refreshing energy drink for young professionals"'
+      return this.t('ads.describeAdConcept')
     },
     parsedScript() {
       if (!this.campaign?.script) return null
@@ -268,6 +281,11 @@ export default {
       } catch {
         return { script: this.campaign.script }
       }
+    },
+    adCredits() {
+      // Ad campaign includes: image generation (~10) + video generation (~20)
+      // Total estimated credits for a complete ad campaign
+      return 30
     }
   },
   mounted() {
@@ -302,7 +320,7 @@ export default {
 
       } catch (error) {
         console.error('Failed to start campaign:', error)
-        alert('Failed to start campaign. Please try again.')
+        alert(this.t('ads.failedToStartCampaign'))
       } finally {
         this.creating = false
       }
@@ -719,6 +737,31 @@ export default {
 
 .brand-input::placeholder {
   color: var(--text-muted);
+}
+
+.generate-btn-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.credit-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #22C55E;
+  white-space: nowrap;
+}
+
+.credit-badge .credit-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .generate-btn {
