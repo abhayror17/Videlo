@@ -25,11 +25,14 @@ Videlo is a modern web application that leverages AI to transform text descripti
 
 | Feature | Description |
 |---------|-------------|
+| **Workflow Canvas** | Visual node-based editor with infinite canvas, zoom controls, and drag-and-drop connections |
+| **BYOK** | Bring Your Own Key - use your own deAPI key for complete control |
 | **Text-to-Image** | Generate high-quality images from text prompts using Flux 2 Klein and ZImage Turbo models |
 | **Text-to-Video** | Create cinematic videos directly from text descriptions |
 | **Image-to-Video** | Transform static images into dynamic video content |
 | **Image Edit** | AI-powered image editing and style transfer with Qwen Image Edit |
 | **AI Ads Generator** | Complete ad campaign pipeline with automated script, image, and video generation |
+| **Multi-language** | English and Chinese language support with easy switching |
 | **Real-time Progress** | Live progress tracking with visual indicators |
 | **Prompt Enhancement** | AI-powered prompt improvement for better results |
 | **Gallery View** | Browse, filter, and manage all your generations |
@@ -42,6 +45,8 @@ Videlo is a modern web application that leverages AI to transform text descripti
 **Frontend**
 - Vue.js 3 with Composition API
 - Vue Router for SPA navigation
+- VueFlow for visual workflow canvas
+- Vue I18n for internationalization
 - Vite for fast development
 - Modern CSS with CSS Variables
 - Axios for API communication
@@ -67,10 +72,13 @@ Videlo/
 │   │   ├── routes/
 │   │   │   ├── generations.py    # Generation endpoints (text2img, txt2video, img2video, img2img)
 │   │   │   ├── prompts.py        # Prompt enhancement
-│   │   │   └── ads.py            # AI Ads Generator pipeline
+│   │   │   ├── ads.py            # AI Ads Generator pipeline
+│   │   │   ├── workflow.py       # Workflow canvas execution
+│   │   │   └── credits.py        # Credit system
 │   │   ├── services/
 │   │   │   ├── deapi.py          # deAPI client
-│   │   │   └── ads_pipeline.py   # Ads generation pipeline
+│   │   │   ├── ads_pipeline.py   # Ads generation pipeline
+│   │   │   └── credit_system.py  # Credit tracking
 │   │   ├── utils/
 │   │   │   └── security.py       # Security utilities
 │   │   ├── config.py             # App configuration
@@ -86,18 +94,41 @@ Videlo/
 │   │   │   ├── Gallery.vue       # Gallery component
 │   │   │   ├── ImageCard.vue     # Image/video card with actions
 │   │   │   ├── ImageModal.vue    # Fullscreen modal
-│   │   │   └── StatusBadge.vue   # Status indicator
+│   │   │   ├── StatusBadge.vue   # Status indicator
+│   │   │   ├── LanguageSwitcher.vue # Language toggle
+│   │   │   ├── WorkflowCanvas.vue   # Visual workflow editor
+│   │   │   └── nodes/            # Workflow node components
+│   │   │       ├── TextInputNode.vue
+│   │   │       ├── ImageGenNode.vue
+│   │   │       ├── ImageInputNode.vue
+│   │   │       ├── ImageEditNode.vue
+│   │   │       ├── ImageEnhanceNode.vue
+│   │   │       ├── ImageAnalysisNode.vue
+│   │   │       ├── ImageBackgroundRemovalNode.vue
+│   │   │       ├── ImageToVideoNode.vue
+│   │   │       ├── VideoGenNode.vue
+│   │   │       ├── VideoToTextNode.vue
+│   │   │       ├── TextToSpeechNode.vue
+│   │   │       └── OutputNode.vue
 │   │   ├── views/
 │   │   │   ├── Home.vue          # Main generation view
 │   │   │   ├── ImageEdit.vue     # Image editing page
-│   │   │   └── AdGenerator.vue   # AI Ads Generator
+│   │   │   ├── AdGenerator.vue   # AI Ads Generator
+│   │   │   └── Workflow.vue      # Workflow canvas page
 │   │   ├── services/
 │   │   │   └── api.js            # API client
+│   │   ├── i18n/                 # Internationalization
+│   │   │   ├── index.js
+│   │   │   └── locales/
+│   │   │       ├── en.js         # English translations
+│   │   │       └── zh.js         # Chinese translations
 │   │   ├── App.vue
 │   │   └── main.js
 │   ├── index.html
 │   ├── vite.config.js
 │   └── package.json
+├── vercel.json                    # Vercel deployment config
+├── render.yaml                    # Render deployment config
 └── docs/
     └── plans/
 ```
@@ -181,6 +212,13 @@ Access the application at `http://localhost:3000`
 | `GET` | `/api/ads/{id}/status` | Poll campaign status |
 | `POST` | `/api/ads/{id}/redo` | Redo a specific step |
 
+### Workflow Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/workflow/execute` | Execute workflow graph |
+| `GET` | `/api/workflow/status/{id}` | Poll workflow execution status |
+
 ### Utility Endpoints
 
 | Method | Endpoint | Description |
@@ -202,7 +240,40 @@ Interactive API documentation: `http://localhost:8000/docs`
 | `/txt2video` | Text to Video generation |
 | `/img2video` | Image to Video generation |
 | `/ads` | AI Ads Generator |
+| `/workflow` | Visual workflow canvas with node-based editor |
 | `/gallery` | Browse all generations |
+
+---
+
+## Workflow Canvas
+
+The Workflow Canvas is a visual node-based editor for creating complex AI pipelines:
+
+### Features
+- **Infinite Canvas** - Pan and zoom freely like Excalidraw
+- **12 Node Types** - Mix and match to create custom workflows
+- **Drag & Connect** - Visual connections between nodes
+- **Quick Actions** - One-click to add connected nodes
+- **Auto-Output** - Multiple images automatically create output nodes
+- **Caching** - Completed nodes skip re-execution
+- **BYOK** - Use your own deAPI key
+
+### Available Nodes
+
+| Node | Input | Output | Description |
+|------|-------|--------|-------------|
+| **Text Input** | - | Text | Enter text prompts |
+| **Image Gen** | Text | Image | Generate images from text |
+| **Image Input** | - | Image | Upload images |
+| **Image Edit** | Image + Text | Image | Edit images with prompts |
+| **Image Enhance** | Image | Image | Enhance image quality |
+| **Image Analysis** | Image | Text | Analyze image content |
+| **Background Removal** | Image | Image | Remove image background |
+| **Image to Video** | Image | Video | Animate static images |
+| **Video Gen** | Text | Video | Generate videos from text |
+| **Video to Text** | Video | Text | Extract text from video |
+| **Text to Speech** | Text | Audio | Convert text to audio |
+| **Output** | Any | - | Final output display |
 
 ---
 
@@ -223,6 +294,16 @@ Interactive API documentation: `http://localhost:8000/docs`
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `VITE_API_URL` | Backend API URL for production | Yes (prod) |
+
+### BYOK (Bring Your Own Key)
+
+Users can provide their own deAPI key directly in the Workflow Canvas:
+1. Click the settings icon (bottom-left)
+2. Enter your deAPI key
+3. Key is stored locally in browser (localStorage)
+4. All workflow requests use your custom key
+
+This allows users to use their own deAPI credits and bypass the shared API key.
 
 ---
 
@@ -299,6 +380,9 @@ Each step can be redone with feedback for iterative refinement.
 - **Optimized polling**: 5-second intervals for status checks
 - **Single refresh**: Consolidated gallery refresh after generation completion
 - **Vue Router**: Client-side navigation for faster page transitions
+- **Workflow caching**: Nodes with existing results skip re-execution
+- **Fast toast**: Success notifications dismiss after 1 second
+- **Asset caching**: Static assets cached for 1 year on Vercel
 
 ---
 
