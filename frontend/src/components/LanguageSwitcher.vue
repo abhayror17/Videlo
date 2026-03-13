@@ -1,13 +1,10 @@
 <template>
-  <div class="language-switcher">
-    <button 
-      v-for="lang in languages" 
-      :key="lang.code"
-      :class="['lang-btn', { active: currentLocale === lang.code }]"
-      @click="switchLanguage(lang.code)"
-    >
-      {{ lang.label }}
-    </button>
+  <div class="language-switcher" @click="toggleLanguage">
+    <span :class="['lang-label', { active: currentLocale === 'en' }]">EN</span>
+    <div class="switch-track">
+      <div class="switch-thumb" :class="{ right: currentLocale === 'zh' }"></div>
+    </div>
+    <span :class="['lang-label', { active: currentLocale === 'zh' }]">中文</span>
   </div>
 </template>
 
@@ -20,19 +17,14 @@ export default {
   setup() {
     const { locale } = useI18n()
     
-    const languages = [
-      { code: 'en', label: 'EN' },
-      { code: 'zh', label: '中文' }
-    ]
-    
-    const switchLanguage = (langCode) => {
-      setLocale(langCode)
+    const toggleLanguage = () => {
+      const newLocale = locale.value === 'en' ? 'zh' : 'en'
+      setLocale(newLocale)
     }
     
     return {
       currentLocale: locale,
-      languages,
-      switchLanguage
+      toggleLanguage
     }
   }
 }
@@ -41,30 +33,53 @@ export default {
 <style scoped>
 .language-switcher {
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
   background: var(--bg-elevated);
-  border-radius: 6px;
-}
-
-.lang-btn {
-  padding: 4px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 500;
+  border-radius: 20px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  user-select: none;
+  transition: all 0.2s ease;
 }
 
-.lang-btn:hover {
-  color: var(--text-secondary);
+.language-switcher:hover {
+  background: var(--bg-input);
 }
 
-.lang-btn.active {
+.lang-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.lang-label.active {
+  color: var(--accent-primary);
+}
+
+.switch-track {
+  width: 36px;
+  height: 20px;
+  background: var(--bg-input);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s ease;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
   background: var(--accent-primary);
-  color: #000;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.switch-thumb.right {
+  transform: translateX(16px);
 }
 </style>
