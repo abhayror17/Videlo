@@ -40,7 +40,13 @@ export default {
     second: 'second',
     seconds: 'seconds',
     aspectRatio: 'Aspect Ratio',
-    numImages: 'Number of Images'
+    numImages: 'Number of Images',
+    bringYourOwnKey: 'Bring Your Own Key',
+    byokDesc: 'Use your own deAPI key to access AI models. Get your key at',
+    enterApiKey: 'Enter your deAPI API key',
+    customKeyActive: 'Custom API key is active',
+    clearKey: 'Clear Key',
+    saveKey: 'Save Key'
   },
   
   // Home / Generation

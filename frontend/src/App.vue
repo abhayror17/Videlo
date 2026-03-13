@@ -104,11 +104,12 @@
           </div>
           <div class="header-actions">
             <LanguageSwitcher />
-            <button class="icon-btn" :title="$t('header.settings')">
+            <button class="icon-btn settings-icon-btn" :title="$t('header.settings')" @click="showSettingsModal = true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
+              <span v-if="hasCustomApiKey" class="settings-badge">✓</span>
             </button>
           </div>
         </header>
@@ -305,6 +306,68 @@
         </div>
       </aside>
     </div>
+
+    <!-- BYOK Settings Modal -->
+    <Teleport to="body">
+      <div v-if="showSettingsModal" class="modal-backdrop" @click.self="showSettingsModal = false">
+        <div class="byok-modal">
+          <button class="modal-close-btn" @click="showSettingsModal = false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          
+          <h3>{{ $t('header.settings') }}</h3>
+          
+          <div class="byok-section">
+            <div class="byok-header">
+              <span class="byok-badge">BYOK</span>
+              <span class="byok-label">{{ $t('settings.bringYourOwnKey') }}</span>
+            </div>
+            <p class="byok-desc">
+              {{ $t('settings.byokDesc') }}
+              <a href="https://deapi.ai" target="_blank" rel="noopener">deapi.ai</a>
+            </p>
+            
+            <div class="api-key-input">
+              <input 
+                :type="showApiKey ? 'text' : 'password'"
+                v-model="customApiKey"
+                :placeholder="$t('settings.enterApiKey')"
+              />
+              <button class="toggle-visibility" @click="showApiKey = !showApiKey">
+                <svg v-if="showApiKey" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div v-if="hasCustomApiKey" class="key-status active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span>{{ $t('settings.customKeyActive') }}</span>
+            </div>
+          </div>
+          
+          <div class="modal-actions">
+            <button class="modal-btn secondary" @click="clearApiKey" :disabled="!hasCustomApiKey">
+              {{ $t('settings.clearKey') }}
+            </button>
+            <button class="modal-btn primary" @click="saveApiKey" :disabled="!customApiKey.trim()">
+              {{ $t('settings.saveKey') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -326,6 +389,9 @@ export default {
     return {
       settingsTab: 'form',
       balance: null,
+      showSettingsModal: false,
+      customApiKey: '',
+      showApiKey: false,
       generationOptions: {
         model: 'Flux_2_Klein_4B_BF16',
         width: 1024,
@@ -349,6 +415,9 @@ export default {
     showSettingsPanel() {
       // Hide settings for ads (uses internal pipeline), gallery, and workflow
       return !['ads', 'gallery', 'workflow'].includes(this.$route.name)
+    },
+    hasCustomApiKey() {
+      return !!localStorage.getItem('deapi_key')
     },
     aspectPresets() {
       return [
@@ -435,6 +504,7 @@ export default {
   },
   mounted() {
     this.loadCachedBalance()
+    this.loadSavedApiKey()
   },
   methods: {
     loadCachedBalance() {
@@ -471,6 +541,22 @@ export default {
     },
     updateOptions(options) {
       this.generationOptions = { ...this.generationOptions, ...options }
+    },
+    loadSavedApiKey() {
+      const savedKey = localStorage.getItem('deapi_key')
+      if (savedKey) {
+        this.customApiKey = savedKey
+      }
+    },
+    saveApiKey() {
+      if (this.customApiKey.trim()) {
+        localStorage.setItem('deapi_key', this.customApiKey.trim())
+        this.showSettingsModal = false
+      }
+    },
+    clearApiKey() {
+      localStorage.removeItem('deapi_key')
+      this.customApiKey = ''
     }
   }
 }
@@ -1083,5 +1169,237 @@ body {
   .settings-panel {
     display: none;
   }
+}
+
+/* Settings Icon Button with Badge */
+.settings-icon-btn {
+  position: relative;
+}
+
+.settings-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  background: #22C55E;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: white;
+  font-weight: bold;
+}
+
+/* BYOK Modal Styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.byok-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  position: relative;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.modal-close-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.byok-modal h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.byok-section {
+  margin-bottom: 20px;
+}
+
+.byok-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.byok-badge {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.byok-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.byok-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.byok-desc a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.byok-desc a:hover {
+  text-decoration: underline;
+}
+
+.api-key-input {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.api-key-input input {
+  flex: 1;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.api-key-input input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.api-key-input input::placeholder {
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.toggle-visibility {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle-visibility:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.toggle-visibility svg {
+  width: 18px;
+  height: 18px;
+}
+
+.key-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
+.key-status.active {
+  color: #22C55E;
+}
+
+.key-status svg {
+  width: 16px;
+  height: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-btn.secondary {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.modal-btn.secondary:hover:not(:disabled) {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.modal-btn.primary {
+  background: var(--accent-primary);
+  border: none;
+  color: #000;
+}
+
+.modal-btn.primary:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+}
+
+.modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

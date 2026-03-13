@@ -40,7 +40,13 @@ export default {
     second: '秒',
     seconds: '秒',
     aspectRatio: '宽高比',
-    numImages: '图片数量'
+    numImages: '图片数量',
+    bringYourOwnKey: '自带密钥',
+    byokDesc: '使用您自己的 deAPI 密钥访问 AI 模型。获取密钥请访问',
+    enterApiKey: '输入您的 deAPI 密钥',
+    customKeyActive: '自定义 API 密钥已激活',
+    clearKey: '清除密钥',
+    saveKey: '保存密钥'
   },
   
   // Home / Generation
