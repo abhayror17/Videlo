@@ -25,7 +25,7 @@ Videlo is a modern web application that leverages AI to transform text descripti
 
 | Feature | Description |
 |---------|-------------|
-| **Workflow Canvas** | Visual node-based editor with infinite canvas, zoom controls, and drag-and-drop connections |
+| **Workflow Canvas** | Visual node-based editor with infinite canvas, zoom controls, drag-and-drop connections, undo/redo, and cut connections |
 | **BYOK** | Bring Your Own Key - use your own deAPI key for complete control |
 | **Text-to-Image** | Generate high-quality images from text prompts using Flux 2 Klein and ZImage Turbo models |
 | **Text-to-Video** | Create cinematic videos directly from text descriptions |
@@ -251,12 +251,27 @@ The Workflow Canvas is a visual node-based editor for creating complex AI pipeli
 
 ### Features
 - **Infinite Canvas** - Pan and zoom freely like Excalidraw
-- **12 Node Types** - Mix and match to create custom workflows
+- **12 Node Types** - Mix and match to create custom workflows with SVG icons
 - **Drag & Connect** - Visual connections between nodes
+- **Undo/Redo** - Full history support with Ctrl+Z / Ctrl+Y
+- **Cut Connections** - Click the ✕ button on selected node connections to delete them
+- **Shortcuts Guide** - Getting Started panel with keyboard shortcuts and tips
 - **Quick Actions** - One-click to add connected nodes
 - **Auto-Output** - Multiple images automatically create output nodes
 - **Caching** - Completed nodes skip re-execution
 - **BYOK** - Use your own deAPI key
+- **Mobile Responsive** - Touch-friendly interface for tablets and phones
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Z` | Undo last action |
+| `Ctrl + Y` | Redo last undone action |
+| `Scroll` | Zoom in/out |
+| `Drag` | Pan canvas |
+| `Right Click` | Open Add Node menu |
+| `Select + Click ✕` | Cut/delete connection |
 
 ### Available Nodes
 
@@ -267,11 +282,11 @@ The Workflow Canvas is a visual node-based editor for creating complex AI pipeli
 | **Image Input** | - | Image | Upload images |
 | **Image Edit** | Image + Text | Image | Edit images with prompts |
 | **Image Enhance** | Image | Image | Enhance image quality |
-| **Image Analysis** | Image | Text | Analyze image content |
+| **Image Analysis** | Image | Text | Analyze image content (OCR) |
 | **Background Removal** | Image | Image | Remove image background |
 | **Image to Video** | Image | Video | Animate static images |
 | **Video Gen** | Text | Video | Generate videos from text |
-| **Video to Text** | Video | Text | Extract text from video |
+| **Video to Text** | Video | Text | Extract text/transcribe video |
 | **Text to Speech** | Text | Audio | Convert text to audio |
 | **Output** | Any | - | Final output display |
 
