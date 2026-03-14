@@ -219,6 +219,30 @@ export default {
     sectionGenerate: '生成',
     sectionTransform: '转换',
     sectionOutput: '输出',
-    save: '保存'
+    save: '保存',
+    // New shortcuts and features
+    undo: '撤销',
+    redo: '重做',
+    cutConnection: '切断连接',
+    deleteConnection: '删除连接',
+    keyboardShortcuts: '键盘快捷键',
+    shortcutsGuide: '操作指南',
+    gettingStarted: '快速入门',
+    infiniteZoom: '无限缩放',
+    rightClickMenu: '右键菜单',
+    dragToConnect: '拖拽连接',
+    selectToCut: '选择后点击切断',
+    addNode: '添加节点',
+    quickStart: '快速开始',
+    settings: '设置',
+    zoom: '缩放',
+    pan: '平移',
+    // Empty state guide
+    scrollToZoom: '滚动缩放',
+    rightClickForMenu: '右键打开菜单',
+    ctrlZToUndo: 'Ctrl+Z 撤销',
+    settingsForKey: '设置中添加密钥',
+    dragToConnectNodes: '拖拽连接节点',
+    selectAndClickX: '选择后点击 ✕ 切断'
   }
 }

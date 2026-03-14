@@ -8,7 +8,9 @@
     </button>
     <div class="node-header">
       <div class="node-icon-wrapper">
-        <span class="node-icon">🖼️</span>
+        <div class="node-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
       </div>
       <span class="node-title">{{ $t('workflow.imageInput') }}</span>
       <div v-if="localData.imageUrl" class="node-status filled"></div>
@@ -173,42 +175,44 @@ const addConnected = (nodeType) => {
 <style scoped>
 .workflow-node {
   position: relative;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  min-width: 240px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease;
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  min-width: 260px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .workflow-node:hover {
-  border-color: rgba(249, 115, 22, 0.3);
-  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.4);
+  box-shadow: 0 12px 40px rgba(249, 115, 22, 0.15);
+  transform: translateY(-2px);
 }
 
 .node-delete-btn {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 22px;
-  height: 22px;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(239, 68, 68, 0.9);
-  border: 2px solid var(--bg-panel);
-  border-radius: 50%;
-  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #EF4444;
   cursor: pointer;
   opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   z-index: 10;
 }
 
 .workflow-node:hover .node-delete-btn {
   opacity: 1;
-  transform: scale(1);
 }
 
 .node-delete-btn:hover {
@@ -224,34 +228,36 @@ const addConnected = (nodeType) => {
 .node-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: 12px 12px 0 0;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .node-icon-wrapper {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.3), rgba(249, 115, 22, 0.1));
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(249, 115, 22, 0.1));
+  border-radius: 10px;
+  color: #FB923C;
 }
 
-.node-icon {
-  font-size: 1rem;
+.node-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .node-title {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: #FB923C;
+  font-weight: 700;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   flex: 1;
+  opacity: 0.9;
 }
 
 .node-status {
@@ -273,14 +279,15 @@ const addConnected = (nodeType) => {
 
 .image-preview {
   position: relative;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 12px;
-  background: var(--bg-elevated);
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   max-height: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .image-preview img {
@@ -300,16 +307,18 @@ const addConnected = (nodeType) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
-  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   color: #fff;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .remove-btn:hover {
   background: #EF4444;
+  border-color: #EF4444;
 }
 
 .remove-btn svg {
@@ -322,30 +331,32 @@ const addConnected = (nodeType) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   padding: 24px;
-  background: var(--bg-input);
-  border: 1px dashed var(--border-color);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .upload-area:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(249, 115, 22, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(249, 115, 22, 0.4);
 }
 
 .upload-area svg {
-  width: 32px;
-  height: 32px;
-  color: #4B5563;
+  width: 40px;
+  height: 40px;
+  color: rgba(255, 255, 255, 0.2);
 }
 
 .upload-text {
   font-size: 0.75rem;
-  color: #6B7280;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
 }
 
 .url-input-wrapper {
@@ -355,17 +366,19 @@ const addConnected = (nodeType) => {
 
 .url-input {
   flex: 1;
-  padding: 10px 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  color: var(--text-primary);
-  font-size: 0.75rem;
+  color: #fff;
+  font-size: 0.8125rem;
+  transition: all 0.2s ease;
 }
 
 .url-input:focus {
   outline: none;
-  border-color: rgba(249, 115, 22, 0.4);
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .url-input::placeholder {
@@ -373,21 +386,22 @@ const addConnected = (nodeType) => {
 }
 
 .url-btn {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(249, 115, 22, 0.1);
   border: 1px solid rgba(249, 115, 22, 0.2);
-  border-radius: 8px;
+  border-radius: 10px;
   color: #FB923C;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .url-btn:hover:not(:disabled) {
   background: rgba(249, 115, 22, 0.2);
+  border-color: #F97316;
 }
 
 .url-btn:disabled {
@@ -401,33 +415,39 @@ const addConnected = (nodeType) => {
 }
 
 .node-handle {
-  width: 14px !important;
-  height: 14px !important;
+  width: 10px !important;
+  height: 10px !important;
+  background: #1A1A1A !important;
+  border: 2px solid #F97316 !important;
+  transition: all 0.2s ease;
+}
+
+.node-handle:hover {
+  transform: scale(1.3);
   background: #F97316 !important;
-  border: 2px solid var(--bg-panel) !important;
 }
 
 .quick-actions {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .quick-action-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: #9CA3AF;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .quick-action-btn:hover {

@@ -8,7 +8,9 @@
     </button>
     <div class="node-header">
       <div class="node-icon-wrapper">
-        <span class="node-icon">🎬</span>
+        <div class="node-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" x2="22" y1="10" y2="10"/><line x1="2" x2="2" y1="7" y2="13"/><line x1="22" x2="22" y1="7" y2="13"/><path d="m9 21 3-3 3 3"/></svg>
+        </div>
       </div>
       <span class="node-title">{{ $t('workflow.textToVideo') }}</span>
       <div v-if="isProcessing" class="node-spinner"></div>
@@ -46,15 +48,6 @@
           <option :value="120">~5 {{ $t('settings.seconds') }}</option>
           <option :value="241">~10 {{ $t('settings.seconds') }}</option>
         </select>
-      </div>
-      
-      <!-- Credit Estimate Display -->
-      <div class="credit-estimate">
-        <div class="credit-badge">
-          <span class="credit-icon">💎</span>
-          <span class="credit-value">{{ estimatedCredits }}</span>
-          <span class="credit-label">{{ $t('credits.credits') || 'credits' }}</span>
-        </div>
       </div>
       
       <!-- Result Preview -->
@@ -106,21 +99,6 @@ watch(() => props.data, (newData) => {
 
 const isProcessing = computed(() => localData.value.status === 'processing')
 
-// Credit estimation based on pricing table
-const estimatedCredits = computed(() => {
-  const model = localData.value.model
-  const frames = localData.value.frames || 49
-  
-  const pricing = {
-    'Ltx2_3_22B_Dist_INT8': { 49: 8, 120: 20, 241: 35 },
-    'Ltx2_19B_Dist_FP8': { 49: 12, 120: 80, 241: 140 },
-    'Ltxv_13B_0_9_8_Distilled_FP8': { 49: 5, 120: 12, 241: 20 }
-  }
-  
-  const modelPricing = pricing[model] || pricing['Ltx2_3_22B_Dist_INT8']
-  return modelPricing[frames] || 20
-})
-
 const onAspectChange = () => {
   const ar = aspectRatios.find(a => a.value === localData.value.aspectRatio)
   if (ar) {
@@ -142,51 +120,53 @@ const deleteNode = () => {
 <style scoped>
 .workflow-node {
   position: relative;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  min-width: 240px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease;
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  min-width: 260px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .workflow-node:hover {
-  border-color: rgba(236, 72, 153, 0.3);
-  box-shadow: 0 8px 32px rgba(236, 72, 153, 0.15);
+  border-color: rgba(236, 72, 153, 0.4);
+  box-shadow: 0 12px 40px rgba(236, 72, 153, 0.15);
+  transform: translateY(-2px);
 }
 
 .workflow-node.processing {
-  border-color: rgba(236, 72, 153, 0.5);
-  box-shadow: 0 0 30px rgba(236, 72, 153, 0.2);
+  border-color: #EC4899;
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.2);
 }
 
 .node-delete-btn {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 22px;
-  height: 22px;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(239, 68, 68, 0.9);
-  border: 2px solid var(--bg-panel);
-  border-radius: 50%;
-  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #EF4444;
   cursor: pointer;
   opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   z-index: 10;
 }
 
 .workflow-node:hover .node-delete-btn {
   opacity: 1;
-  transform: scale(1);
 }
 
 .node-delete-btn:hover {
-  background: #EF4444;
+  background: rgba(239, 68, 68, 0.2);
   transform: scale(1.1);
 }
 
@@ -198,34 +178,36 @@ const deleteNode = () => {
 .node-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: 12px 12px 0 0;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .node-icon-wrapper {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(236, 72, 153, 0.1));
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(236, 72, 153, 0.1));
+  border-radius: 10px;
+  color: #F472B6;
 }
 
-.node-icon {
-  font-size: 1rem;
+.node-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .node-title {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: #F472B6;
+  font-weight: 700;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   flex: 1;
+  opacity: 0.9;
 }
 
 .node-status {
@@ -241,8 +223,8 @@ const deleteNode = () => {
 }
 
 .node-spinner {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(236, 72, 153, 0.2);
   border-top-color: #EC4899;
   border-radius: 50%;
@@ -258,7 +240,7 @@ const deleteNode = () => {
 }
 
 .form-row {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .form-row:last-child {
@@ -267,94 +249,75 @@ const deleteNode = () => {
 
 .form-row label {
   display: block;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #6B7280;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
 }
 
 .form-select,
-.form-input {
+.form-textarea {
   width: 100%;
-  padding: 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  padding: 10px 32px 10px 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 0.8125rem;
+  font-family: inherit;
   transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+}
+
+.form-select option {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.form-select option:hover,
+.form-select option:focus,
+.form-select option:checked {
+  background: rgba(236, 72, 153, 0.3);
+  color: #fff;
 }
 
 .form-select:focus,
-.form-input:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: #EC4899;
-  background: var(--bg-elevated);
-}
-
-.form-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 0.8125rem;
-  resize: none;
-  font-family: inherit;
-  transition: all 0.2s ease;
+  border-color: rgba(236, 72, 153, 0.8);
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
 }
 
 .form-textarea::placeholder {
   color: var(--text-muted);
 }
 
-.credit-estimate {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.credit-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(168, 85, 247, 0.05));
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  border-radius: 8px;
-}
-
-.credit-icon {
-  font-size: 0.875rem;
-}
-
-.credit-value {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: #A855F7;
-}
-
-.credit-label {
-  font-size: 0.6875rem;
-  color: #9CA3AF;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
 .result-preview {
-  margin-top: 14px;
+  margin-top: 16px;
   position: relative;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   max-height: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .result-preview video {
@@ -369,21 +332,28 @@ const deleteNode = () => {
   position: absolute;
   top: 8px;
   left: 8px;
-  padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   border-radius: 6px;
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .node-handle {
-  width: 14px !important;
-  height: 14px !important;
+  width: 10px !important;
+  height: 10px !important;
+  background: #1A1A1A !important;
+  border: 2px solid #EC4899 !important;
+  transition: all 0.2s ease;
+}
+
+.node-handle:hover {
+  transform: scale(1.3);
   background: #EC4899 !important;
-  border: 2px solid var(--bg-panel) !important;
 }
 </style>

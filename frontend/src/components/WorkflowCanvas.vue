@@ -102,6 +102,8 @@
             @connect="onConnect"
             @connect-end="onConnectEnd"
             @node-context-menu="onNodeContextMenu"
+            @edge-click="onEdgeClick"
+            @nodes-change="onNodesChange"
             :default-viewport="{ zoom: 1, x: 0, y: 0 }"
             :min-zoom="0.1"
             :max-zoom="4"
@@ -112,7 +114,7 @@
             class="vue-flow-instance"
             @viewport-change="onViewportChange"
           >
-            <Background variant="dots" :gap="24" :size="2" pattern-color="rgba(255, 255, 255, 0.08)" />
+            <Background variant="dots" :gap="24" :size="2" pattern-color="rgba(255, 255, 255, 0.3)" />
           </VueFlow>
           
           <!-- Settings Button (BYOK) -->
@@ -146,6 +148,14 @@
             </button>
           </div>
 
+          <!-- Add Node Floating Button (Mobile Friendly) -->
+          <button class="fab-btn" @click.stop="toggleCanvasMenu" title="Add Node">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+
           <!-- Canvas Context Menu (Quick Add) -->
           <Teleport to="body">
             <div
@@ -154,42 +164,131 @@
               :style="{ left: canvasContextMenu.x + 'px', top: canvasContextMenu.y + 'px' }"
               @click.stop
             >
-              <div class="context-menu-title">Add Node</div>
-              <div class="context-menu-grid">
-                <button 
-                  v-for="nt in nodeTypes" 
-                  :key="nt.type" 
-                  class="context-node-btn"
-                  :style="{ '--node-accent': nt.color }"
-                  @click="addNodeAtPosition(nt.type, canvasContextMenu.x, canvasContextMenu.y)"
-                >
-                  <span class="context-node-icon">{{ nt.icon }}</span>
-                  <span class="context-node-label">{{ nt.label }}</span>
+              <div class="context-menu-header">
+                <div class="context-menu-title">Add Node</div>
+                <button class="context-close-btn" @click="closeContextMenu">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
                 </button>
+              </div>
+              <div class="context-menu-scroll">
+                <div v-for="section in ['input', 'generate', 'transform', 'output']" :key="section" class="context-section">
+                  <div class="section-label" :style="{ '--section-color': getSectionColor(section) }">{{ section }}</div>
+                  <div class="context-menu-grid">
+                    <button 
+                      v-for="nt in nodeTypes.filter(n => n.section === section)" 
+                      :key="nt.type" 
+                      class="context-node-btn"
+                      :style="{ '--node-accent': nt.color, '--node-accent-rgb': hexToRgb(nt.color) }"
+                      @click="addNodeAtPosition(nt.type, canvasContextMenu.x, canvasContextMenu.y)"
+                      :title="nt.label"
+                    >
+                      <span class="context-node-icon" v-html="nt.icon"></span>
+                      <span class="context-node-label">{{ nt.label }}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </Teleport>
 
-          <!-- Empty State -->
+          <!-- Empty State - Shortcuts Guide -->
           <div v-if="nodes.length === 0" class="canvas-empty">
-            <div class="empty-visual">
-              <div class="empty-circles">
-                <div class="empty-circle c1"></div>
-                <div class="empty-circle c2"></div>
-                <div class="empty-circle c3"></div>
+            <div class="shortcuts-guide">
+              <h3 class="guide-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                {{ $t('workflow.gettingStarted') }}
+              </h3>
+              
+              <div class="shortcuts-grid">
+                <div class="shortcut-item">
+                  <div class="shortcut-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="8"/>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                  </div>
+                  <div class="shortcut-info">
+                    <span class="shortcut-key">{{ $t('workflow.scrollToZoom') }}</span>
+                    <span class="shortcut-desc">{{ $t('workflow.infiniteZoom') }}</span>
+                  </div>
+                </div>
+
+                <div class="shortcut-item">
+                  <div class="shortcut-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <path d="M21 15l-5-5L5 21"/>
+                    </svg>
+                  </div>
+                  <div class="shortcut-info">
+                    <span class="shortcut-key">{{ $t('workflow.rightClickForMenu') }}</span>
+                    <span class="shortcut-desc">{{ $t('workflow.addNode') }}</span>
+                  </div>
+                </div>
+
+                <div class="shortcut-item">
+                  <div class="shortcut-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                  </div>
+                  <div class="shortcut-info">
+                    <span class="shortcut-key">Ctrl + Z</span>
+                    <span class="shortcut-desc">{{ $t('workflow.undo') }}</span>
+                  </div>
+                </div>
+
+                <div class="shortcut-item">
+                  <div class="shortcut-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82V9a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                  </div>
+                  <div class="shortcut-info">
+                    <span class="shortcut-key">{{ $t('header.settings') }}</span>
+                    <span class="shortcut-desc">{{ $t('workflow.settingsForKey') }}</span>
+                  </div>
+                </div>
+
+                <div class="shortcut-item">
+                  <div class="shortcut-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </div>
+                  <div class="shortcut-info">
+                    <span class="shortcut-key">{{ $t('workflow.dragToConnect') }}</span>
+                    <span class="shortcut-desc">{{ $t('workflow.connections') }}</span>
+                  </div>
+                </div>
+
+                <div class="shortcut-item">
+                  <div class="shortcut-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </div>
+                  <div class="shortcut-info">
+                    <span class="shortcut-key">{{ $t('workflow.selectAndClickX') }}</span>
+                    <span class="shortcut-desc">{{ $t('workflow.cutConnection') }}</span>
+                  </div>
+                </div>
               </div>
-              <svg class="empty-illustration" viewBox="0 0 120 120" fill="none">
-                <rect x="10" y="40" width="30" height="30" rx="6" stroke="currentColor" stroke-width="2"/>
-                <rect x="80" y="40" width="30" height="30" rx="6" stroke="currentColor" stroke-width="2"/>
-                <path d="M40 55h40" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4"/>
-                <circle cx="25" cy="55" r="4" fill="currentColor"/>
-                <circle cx="95" cy="55" r="4" fill="currentColor"/>
-              </svg>
             </div>
-            <h3>WHY Settle for LESS?</h3>
-            <p>Infinite Canvas with BYOK</p>
+            
             <div class="empty-quick-add">
-              <span>Quick start:</span>
+              <span>{{ $t('workflow.quickStart') }}:</span>
               <button @click="addNode('textInput')" class="quick-add-btn">+ Text Input</button>
               <button @click="addNode('imageGen')" class="quick-add-btn">+ Image Gen</button>
               <button @click="addNode('img2video')" class="quick-add-btn">+ Image to Video</button>
@@ -421,18 +520,18 @@ const nodeTypesMap = {
 
 // Node definitions
 const nodeDefinitions = computed(() => ({
-  textInput: { icon: '📝', label: t('workflow.textPrompt'), desc: 'Enter text prompts', color: '#6366F1', section: 'input' },
-  imageInput: { icon: '🖼️', label: t('workflow.imageInput'), desc: 'Upload images', color: '#F97316', section: 'input' },
-  imageGen: { icon: '🎨', label: t('workflow.textToImage'), desc: 'Generate images from text', color: '#A855F7', section: 'generate' },
-  videoGen: { icon: '🎬', label: t('workflow.textToVideo'), desc: 'Generate videos from text', color: '#EC4899', section: 'generate' },
-  imageEdit: { icon: '✏️', label: t('workflow.imageEdit'), desc: 'Edit images with AI', color: '#22C55E', section: 'transform' },
-  img2video: { icon: '🎥', label: t('workflow.imageToVideo'), desc: 'Animate static images', color: '#0EA5E9', section: 'transform' },
-  tts: { icon: '🔊', label: t('workflow.textToSpeech'), desc: 'Convert text to audio', color: '#8B5CF6', section: 'transform' },
-  imageAnalysis: { icon: '🔍', label: t('workflow.imageAnalysis'), desc: 'Analyze image content', color: '#06B6D4', section: 'transform' },
-  bgRemoval: { icon: '🖼️', label: t('workflow.bgRemoval'), desc: 'Remove image background', color: '#EC4899', section: 'transform' },
-  videoToText: { icon: '📹', label: t('workflow.videoToText'), desc: 'Transcribe videos', color: '#22C55E', section: 'transform' },
-  imageEnhance: { icon: '✨', label: t('workflow.imageEnhance'), desc: 'Enhance image quality', color: '#FBBF24', section: 'transform' },
-  output: { icon: '📤', label: t('workflow.output'), desc: 'Final output node', color: '#F59E0B', section: 'output' }
+  textInput: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>', label: t('workflow.textPrompt'), desc: 'Enter text prompts', color: '#6366F1', section: 'input', sectionColor: '#6366F1' },
+  imageInput: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', label: t('workflow.imageInput'), desc: 'Upload images', color: '#F97316', section: 'input', sectionColor: '#6366F1' },
+  imageGen: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.912 5.886h6.19l-5.007 3.638L17.007 18.41 12 14.772l-5.007 3.638 1.912-5.886-5.007-3.638h6.19z"/></svg>', label: t('workflow.textToImage'), desc: 'Generate images from text', color: '#A855F7', section: 'generate', sectionColor: '#EC4899' },
+  videoGen: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" x2="22" y1="10" y2="10"/><line x1="2" x2="2" y1="7" y2="13"/><line x1="22" x2="22" y1="7" y2="13"/><path d="m9 21 3-3 3 3"/></svg>', label: t('workflow.textToVideo'), desc: 'Generate videos from text', color: '#EC4899', section: 'generate', sectionColor: '#EC4899' },
+  imageEdit: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>', label: t('workflow.imageEdit'), desc: 'Edit images with AI', color: '#22C55E', section: 'transform', sectionColor: '#0EA5E9' },
+  img2video: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/><path d="m16 2 6 6-6 6"/></svg>', label: t('workflow.imageToVideo'), desc: 'Animate static images', color: '#0EA5E9', section: 'transform', sectionColor: '#0EA5E9' },
+  tts: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>', label: t('workflow.textToSpeech'), desc: 'Convert text to audio', color: '#8B5CF6', section: 'transform', sectionColor: '#0EA5E9' },
+  imageAnalysis: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>', label: t('workflow.imageAnalysis'), desc: 'Analyze image content', color: '#06B6D4', section: 'transform', sectionColor: '#0EA5E9' },
+  bgRemoval: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', label: t('workflow.bgRemoval'), desc: 'Remove image background', color: '#EC4899', section: 'transform', sectionColor: '#0EA5E9' },
+  videoToText: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M7 21h10"/><path d="M12 17v4"/><path d="M9 8h6"/><path d="M9 12h6"/></svg>', label: t('workflow.videoToText'), desc: 'Transcribe videos', color: '#22C55E', section: 'transform', sectionColor: '#0EA5E9' },
+  imageEnhance: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.912 5.886h6.19l-5.007 3.638L17.007 18.41 12 14.772l-5.007 3.638 1.912-5.886-5.007-3.638h6.19z"/><path d="M5 3 2 6l3 3"/><path d="m19 3 3 3-3 3"/></svg>', label: t('workflow.imageEnhance'), desc: 'Enhance image quality', color: '#FBBF24', section: 'transform', sectionColor: '#0EA5E9' },
+  output: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>', label: t('workflow.output'), desc: 'Final output node', color: '#F59E0B', section: 'output', sectionColor: '#F59E0B' }
 }))
 
 const nodeTypes = computed(() => 
@@ -452,6 +551,58 @@ const savedWorkflows = ref([])
 const showSavedDropdown = ref(false)
 const nameInput = ref(null)
 let nodeIdCounter = 0
+
+// Undo/Redo History
+const history = ref([])
+const historyIndex = ref(-1)
+const maxHistorySize = 50
+
+// Save current state to history
+const saveHistory = () => {
+  // Remove any future states if we're in the middle of the history
+  if (historyIndex.value < history.value.length - 1) {
+    history.value = history.value.slice(0, historyIndex.value + 1)
+  }
+  
+  // Add new state
+  history.value.push({
+    nodes: JSON.parse(JSON.stringify(nodes.value)),
+    edges: JSON.parse(JSON.stringify(edges.value)),
+    nodeIdCounter
+  })
+  
+  // Limit history size
+  if (history.value.length > maxHistorySize) {
+    history.value.shift()
+  } else {
+    historyIndex.value++
+  }
+}
+
+// Undo last action
+const undo = () => {
+  if (historyIndex.value > 0) {
+    historyIndex.value--
+    const state = history.value[historyIndex.value]
+    nodes.value = JSON.parse(JSON.stringify(state.nodes))
+    edges.value = JSON.parse(JSON.stringify(state.edges))
+    nodeIdCounter = state.nodeIdCounter
+  }
+}
+
+// Redo last undone action
+const redo = () => {
+  if (historyIndex.value < history.value.length - 1) {
+    historyIndex.value++
+    const state = history.value[historyIndex.value]
+    nodes.value = JSON.parse(JSON.stringify(state.nodes))
+    edges.value = JSON.parse(JSON.stringify(state.edges))
+    nodeIdCounter = state.nodeIdCounter
+  }
+}
+
+// Initialize history with empty state
+saveHistory()
 
 // Settings modal (BYOK)
 const showSettingsModal = ref(false)
@@ -524,11 +675,27 @@ const onDrop = (event) => {
 
 // Connections
 const onConnect = (params) => {
+  const edgeId = `e_${params.source}_${params.target}_${Date.now()}`
   edges.value = addEdge({
     ...params,
+    id: edgeId,
     animated: true,
-    style: { stroke: '#F59E0B', strokeWidth: 2 }
+    style: { stroke: '#F59E0B', strokeWidth: 2 },
+    label: '✕',
+    labelStyle: { fill: '#EF4444', fontWeight: 'bold', fontSize: '14px' },
+    labelBgStyle: { fill: 'rgba(0,0,0,0.8)', stroke: '#EF4444', strokeWidth: 1, rx: 10, ry: 10 },
+    labelBgPadding: [6, 6],
+    labelBgBorderRadius: 10,
+    class: selectedNodes.value.has(params.source) || selectedNodes.value.has(params.target) 
+      ? 'cuttable-edge selected' 
+      : 'cuttable-edge'
   }, edges.value)
+}
+
+// Delete edge by ID
+const deleteEdge = (edgeId) => {
+  edges.value = edges.value.filter(e => e.id !== edgeId)
+  saveHistory()
 }
 
 // Handle connection end on empty canvas - show quick-add menu
@@ -578,10 +745,62 @@ const onNodeContextMenu = (event) => {
   }
 }
 
+// Edge Click - Delete connection
+const onEdgeClick = (event) => {
+  const edge = event.edge
+  if (edge && edge.id) {
+    deleteEdge(edge.id)
+  }
+}
+
+// Track selected nodes and update connected edges
+const selectedNodes = ref(new Set())
+
+const onNodesChange = (changes) => {
+  changes.forEach(change => {
+    if (change.type === 'select') {
+      if (change.selected) {
+        selectedNodes.value.add(change.id)
+      } else {
+        selectedNodes.value.delete(change.id)
+      }
+    }
+  })
+  
+  // Update edges to show/hide cut buttons based on connected node selection
+  updateEdgeSelection()
+}
+
+const updateEdgeSelection = () => {
+  edges.value = edges.value.map(edge => {
+    const isConnected = selectedNodes.value.has(edge.source) || selectedNodes.value.has(edge.target)
+    return {
+      ...edge,
+      class: isConnected ? 'cuttable-edge selected' : 'cuttable-edge'
+    }
+  })
+}
+
 const closeContextMenu = () => {
   contextMenu.value = { show: false, x: 0, y: 0, nodeId: null }
   canvasContextMenu.value = { show: false, x: 0, y: 0 }
   pendingConnection.value = null
+}
+
+const toggleCanvasMenu = (event) => {
+  if (canvasContextMenu.value.show) {
+    closeContextMenu()
+  } else {
+    // If it's a click from the FAB, center it or put it in a reasonable place
+    const x = event.clientX || window.innerWidth / 2 - 140
+    const y = event.clientY || window.innerHeight / 2 - 200
+    
+    canvasContextMenu.value = {
+      show: true,
+      x: Math.max(20, Math.min(x, window.innerWidth - 300)),
+      y: Math.max(20, Math.min(y, window.innerHeight - 400))
+    }
+  }
 }
 
 // Canvas Context Menu (Quick Add)
@@ -600,6 +819,7 @@ const deleteNode = (nodeId) => {
   nodes.value = nodes.value.filter(n => n.id !== nodeId)
   edges.value = edges.value.filter(e => e.source !== nodeId && e.target !== nodeId)
   contextMenu.value = { show: false, x: 0, y: 0, nodeId: null }
+  saveHistory()
 }
 
 const duplicateNode = (nodeId) => {
@@ -612,6 +832,7 @@ const duplicateNode = (nodeId) => {
       position: { x: node.position.x + 50, y: node.position.y + 50 },
       data: { ...node.data }
     }]
+    saveHistory()
   }
   contextMenu.value = { show: false, x: 0, y: 0, nodeId: null }
 }
@@ -627,6 +848,8 @@ const addNode = (type) => {
     position: { x: baseX, y: baseY },
     data: getDefaultData(type)
   }]
+  
+  saveHistory()
 }
 
 const addNodeAtPosition = (type, screenX, screenY) => {
@@ -653,6 +876,8 @@ const addNodeAtPosition = (type, screenX, screenY) => {
     data: getDefaultData(type)
   }]
   
+  saveHistory()
+  
   // If there's a pending connection, create the edge
   if (pendingConnection.value) {
     const { sourceNodeId, sourceHandleId, sourceHandleType } = pendingConnection.value
@@ -660,20 +885,50 @@ const addNodeAtPosition = (type, screenX, screenY) => {
     // Determine target handle (opposite of source)
     const targetHandle = sourceHandleType === 'source' ? 'target' : 'source'
     
+    const sourceId = sourceHandleType === 'source' ? sourceNodeId : id
+    const targetId = sourceHandleType === 'source' ? id : sourceNodeId
     edges.value = addEdge({
-      id: `e_${sourceNodeId}_${id}`,
-      source: sourceHandleType === 'source' ? sourceNodeId : id,
-      target: sourceHandleType === 'source' ? id : sourceNodeId,
+      id: `e_${sourceNodeId}_${id}_${Date.now()}`,
+      source: sourceId,
+      target: targetId,
       sourceHandle: sourceHandleId,
       targetHandle: targetHandle,
       animated: true,
-      style: { stroke: '#F59E0B', strokeWidth: 2 }
+      style: { stroke: '#F59E0B', strokeWidth: 2 },
+      label: '✕',
+      labelStyle: { fill: '#EF4444', fontWeight: 'bold', fontSize: '14px' },
+      labelBgStyle: { fill: 'rgba(0,0,0,0.8)', stroke: '#EF4444', strokeWidth: 1, rx: 10, ry: 10 },
+      labelBgPadding: [6, 6],
+      labelBgBorderRadius: 10,
+      class: selectedNodes.value.has(sourceId) || selectedNodes.value.has(targetId)
+        ? 'cuttable-edge selected'
+        : 'cuttable-edge'
     }, edges.value)
     
     pendingConnection.value = null
+    saveHistory()
   }
   
   canvasContextMenu.value = { show: false, x: 0, y: 0 }
+}
+
+// Helper function to get section color
+const getSectionColor = (section) => {
+  const colors = {
+    input: '#6366F1',
+    generate: '#EC4899',
+    transform: '#0EA5E9',
+    output: '#F59E0B'
+  }
+  return colors[section] || '#6366F1'
+}
+
+// Helper function to convert hex to RGB for CSS variables
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result 
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+    : '99, 102, 241'
 }
 
 const getDefaultData = (type) => {
@@ -699,6 +954,7 @@ const clearCanvas = () => {
   edges.value = []
   nodeIdCounter = 0
   executionStatus.value = null
+  saveHistory()
 }
 
 // Quick action: Add connected node
@@ -746,15 +1002,24 @@ const addConnectedNode = (sourceNodeId, targetType) => {
   nodes.value = [...nodes.value, newNode]
 
   // Create edge from source to new node
-  const edgeId = `edge-${sourceNodeId}-${id}`
+  const edgeId = `edge-${sourceNodeId}-${id}-${Date.now()}`
   edges.value = [...edges.value, {
     id: edgeId,
     source: sourceNodeId,
     target: id,
     animated: true,
-    style: { stroke: '#F59E0B', strokeWidth: 2 }
+    style: { stroke: '#F59E0B', strokeWidth: 2 },
+    label: '✕',
+    labelStyle: { fill: '#EF4444', fontWeight: 'bold', fontSize: '14px' },
+    labelBgStyle: { fill: 'rgba(0,0,0,0.8)', stroke: '#EF4444', strokeWidth: 1, rx: 10, ry: 10 },
+    labelBgPadding: [6, 6],
+    labelBgBorderRadius: 10,
+    class: selectedNodes.value.has(sourceNodeId) || selectedNodes.value.has(id)
+      ? 'cuttable-edge selected'
+      : 'cuttable-edge'
   }]
 
+  saveHistory()
   return id
 }
 
@@ -893,13 +1158,19 @@ const pollExecution = async (executionId) => {
                 
                 // Connect the output node to the source
                 edges.value = [...edges.value, {
-                  id: `e_${nodeId}_${outputId}`,
+                  id: `e_${nodeId}_${outputId}_${Date.now()}`,
                   source: nodeId,
                   target: outputId,
                   sourceHandle: 'source',
                   targetHandle: 'target',
                   animated: true,
-                  style: { stroke: '#F59E0B', strokeWidth: 2 }
+                  style: { stroke: '#F59E0B', strokeWidth: 2 },
+                  label: '✕',
+                  labelStyle: { fill: '#EF4444', fontWeight: 'bold', fontSize: '14px' },
+                  labelBgStyle: { fill: 'rgba(0,0,0,0.8)', stroke: '#EF4444', strokeWidth: 1, rx: 10, ry: 10 },
+                  labelBgPadding: [6, 6],
+                  labelBgBorderRadius: 10,
+                  class: 'cuttable-edge'
                 }]
               }
             }
@@ -937,9 +1208,28 @@ const pollExecution = async (executionId) => {
   executionStatus.value = { type: 'error', message: t('workflow.timeout') }
 }
 
+// Keyboard event handler
+const handleKeydown = (e) => {
+  // Undo: Ctrl+Z
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault()
+    undo()
+  }
+  // Redo: Ctrl+Y or Ctrl+Shift+Z
+  else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    e.preventDefault()
+    redo()
+  }
+}
+
 onMounted(() => {
   loadSavedWorkflows()
   loadSavedApiKey()
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -1036,6 +1326,13 @@ onMounted(() => {
 .action-btn:hover:not(:disabled) {
   background: var(--bg-elevated);
   border-color: var(--border-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .action-btn:disabled {
@@ -1417,7 +1714,7 @@ onMounted(() => {
   height: 16px;
 }
 
-/* Empty State */
+/* Empty State - Shortcuts Guide */
 .canvas-empty {
   position: absolute;
   top: 50%;
@@ -1429,64 +1726,101 @@ onMounted(() => {
   text-align: center;
   pointer-events: none;
   z-index: 5;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 20px;
 }
 
-.empty-visual {
-  position: relative;
-  width: 160px;
-  height: 160px;
+.shortcuts-guide {
+  background: rgba(18, 18, 26, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin-bottom: 28px;
+  box-shadow: 
+    0 32px 64px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+  pointer-events: auto;
+  width: 100%;
+}
+
+.guide-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
   margin-bottom: 24px;
+  letter-spacing: -0.02em;
 }
 
-.empty-circles {
-  position: absolute;
-  inset: 0;
+.guide-title svg {
+  width: 24px;
+  height: 24px;
+  color: #F59E0B;
 }
 
-.empty-circle {
-  position: absolute;
-  border-radius: 50%;
-  border: 1px solid rgba(245, 158, 11, 0.1);
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  text-align: left;
 }
 
-.empty-circle.c1 {
-  inset: 0;
-  animation: pulse 3s ease-in-out infinite;
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  transition: all 0.2s ease;
 }
 
-.empty-circle.c2 {
-  inset: 20px;
-  animation: pulse 3s ease-in-out infinite 0.5s;
+.shortcut-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(245, 158, 11, 0.3);
+  transform: translateY(-2px);
 }
 
-.empty-circle.c3 {
-  inset: 40px;
-  animation: pulse 3s ease-in-out infinite 1s;
+.shortcut-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
+  border-radius: 10px;
+  color: #F59E0B;
+  flex-shrink: 0;
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1); opacity: 0.5; }
-  50% { transform: scale(1.05); opacity: 1; }
+.shortcut-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
-.empty-illustration {
-  position: absolute;
-  inset: 30px;
-  color: rgba(255, 255, 255, 0.3);
+.shortcut-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.canvas-empty h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+.shortcut-key {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.3px;
 }
 
-.canvas-empty p {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  max-width: 280px;
-  margin-bottom: 24px;
+.shortcut-desc {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
 }
 
 .empty-quick-add {
@@ -1568,65 +1902,251 @@ onMounted(() => {
   margin: 4px 0;
 }
 
-/* Canvas Context Menu (Quick Add) */
+/* Canvas Context Menu (Quick Add) - Compact Icon-First Design */
 .canvas-context-menu {
   position: fixed;
   z-index: 1001;
   background: rgba(18, 18, 26, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  padding: 12px;
+  padding: 0;
+  width: auto;
   min-width: 280px;
-  max-width: 320px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(20px);
+  max-width: 340px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 
+    0 32px 64px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 40px rgba(245, 158, 11, 0.1);
+  overflow: hidden;
+  animation: menuAppear 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes menuAppear {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.context-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
 }
 
 .context-menu-title {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #6B7280;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  margin-bottom: 10px;
+  letter-spacing: 1.5px;
 }
 
-.context-menu-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.context-close-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.context-close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #EF4444;
+}
+
+.context-close-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.context-menu-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.context-menu-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.context-menu-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.context-section {
+  margin-bottom: 14px;
+}
+
+.context-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  margin-left: 4px;
+  display: flex;
+  align-items: center;
   gap: 6px;
 }
 
+.section-label::before {
+  content: '';
+  width: 12px;
+  height: 3px;
+  background: var(--section-color, rgba(255, 255, 255, 0.3));
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--section-color, rgba(255, 255, 255, 0.2));
+  transition: all 0.2s ease;
+}
+
+.context-section:hover .section-label::before {
+  width: 16px;
+  box-shadow: 0 0 12px var(--section-color, rgba(255, 255, 255, 0.4));
+}
+
+/* 4-column compact grid */
+.context-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+/* Compact icon-only buttons */
 .context-node-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid transparent;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.context-node-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--node-accent, #6366F1), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .context-node-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--node-accent, rgba(99, 102, 241, 0.3));
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--node-accent, #6366F1);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(var(--node-accent-rgb, 99, 102, 241), 0.2);
+}
+
+.context-node-btn:hover::before {
+  opacity: 0.1;
+}
+
+.context-node-btn:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .context-node-icon {
-  font-size: 1.25rem;
+  width: 22px;
+  height: 22px;
+  color: var(--node-accent, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.95;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.2s ease;
 }
 
+.context-node-btn:hover .context-node-icon {
+  transform: scale(1.15);
+}
+
+.context-node-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2px;
+}
+
+/* Minimal text - single line, truncated */
 .context-node-label {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: #D1D5DB;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
   text-align: center;
-  line-height: 1.2;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 2px;
+  position: relative;
+  z-index: 1;
+}
+
+.context-node-btn:hover .context-node-label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* FAB Button */
+.fab-btn {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  border: none;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+  cursor: pointer;
+  z-index: 60;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-btn:hover {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.4);
+}
+
+.fab-btn svg {
+  width: 24px;
+  height: 24px;
 }
 
 
@@ -1809,6 +2329,30 @@ onMounted(() => {
   outline: none;
   border-color: var(--accent-primary);
   background: var(--bg-elevated);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+/* Enhanced focus states for accessibility */
+.action-btn:focus-visible,
+.zoom-btn:focus-visible,
+.settings-btn:focus-visible,
+.fab-btn:focus-visible,
+.context-node-btn:focus-visible,
+.quick-add-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better text rendering */
+.workflow-canvas {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .form-field input::placeholder {
@@ -1910,6 +2454,56 @@ onMounted(() => {
 :deep(.vue-flow__edge.animated path) {
   stroke: rgba(255, 255, 255, 0.6) !important;
   stroke-width: 2 !important;
+}
+
+/* Cuttable Edge Styles - Show only when edge or connected node is selected */
+:deep(.cuttable-edge) {
+  cursor: pointer;
+}
+
+:deep(.cuttable-edge .vue-flow__edge-label) {
+  cursor: pointer;
+  pointer-events: all;
+  opacity: 0;
+  transition: all 0.2s ease;
+  transform: scale(0.8);
+}
+
+/* Show cut button when edge is selected */
+:deep(.cuttable-edge.selected .vue-flow__edge-label) {
+  opacity: 1;
+  transform: scale(1);
+}
+
+:deep(.cuttable-edge .vue-flow__edge-label > div) {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border: 1px solid rgba(239, 68, 68, 0.5) !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+
+:deep(.cuttable-edge.selected .vue-flow__edge-label > div) {
+  background: rgba(239, 68, 68, 0.9) !important;
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+}
+
+:deep(.cuttable-edge .vue-flow__edge-label span) {
+  color: #EF4444 !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  line-height: 1 !important;
+  transition: color 0.2s ease;
+}
+
+:deep(.cuttable-edge.selected .vue-flow__edge-label span) {
+  color: #fff !important;
 }
 
 :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
@@ -2068,6 +2662,354 @@ onMounted(() => {
 }
 
 :deep(.vue-flow__background pattern circle) {
-  fill: rgba(255, 255, 255, 0.06) !important;
+  fill: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Mobile Responsiveness - Comprehensive */
+@media (max-width: 1024px) {
+  .workflow-header {
+    padding: 12px 16px;
+  }
+
+  .header-actions {
+    gap: 8px;
+  }
+
+  .action-btn {
+    padding: 8px 14px;
+  }
+
+  .action-btn span {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .workflow-header {
+    padding: 10px 12px;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .header-left {
+    flex-shrink: 0;
+  }
+
+  .logo-link span {
+    display: none; /* Hide logo text on mobile */
+  }
+
+  .logo-link svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .breadcrumb-sep,
+  .breadcrumb-current {
+    display: none;
+  }
+
+  .header-actions {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    padding-bottom: 0;
+  }
+
+  .header-actions::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
+  .action-btn {
+    padding: 8px;
+    min-width: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-btn span:not(.badge) {
+    display: none; /* Hide button text on mobile, keep icons */
+  }
+
+  .action-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .action-btn.primary.run {
+    padding: 8px 16px;
+  }
+
+  .action-btn.primary.run span {
+    display: block;
+    font-size: 0.8rem;
+  }
+
+  /* Reposition controls for mobile */
+  .zoom-indicator {
+    bottom: 16px;
+    left: 16px;
+    right: auto;
+    padding: 3px;
+  }
+
+  .zoom-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .zoom-value {
+    font-size: 0.7rem;
+    min-width: 40px;
+  }
+
+  .settings-btn {
+    bottom: 16px;
+    right: 16px;
+    left: auto;
+    width: 44px;
+    height: 44px;
+  }
+
+  .settings-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .fab-btn {
+    bottom: 76px;
+    right: 16px;
+    width: 60px;
+    height: 60px;
+  }
+
+  .fab-btn svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Context menu improvements - Mobile */
+  .canvas-context-menu {
+    width: calc(100vw - 24px);
+    max-width: 360px;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: 80vh;
+    border-radius: 14px;
+  }
+
+  .context-menu-header {
+    padding: 10px 14px;
+  }
+
+  .context-menu-title {
+    font-size: 0.7rem;
+  }
+
+  .context-menu-scroll {
+    padding: 8px;
+  }
+
+  /* 3-column on mobile for better fit */
+  .context-menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+
+  .context-node-btn {
+    padding: 8px 3px;
+    gap: 3px;
+  }
+
+  .context-node-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .context-node-icon :deep(svg) {
+    width: 16px;
+    height: 16px;
+  }
+
+  .context-node-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.3px;
+  }
+
+  .section-label {
+    font-size: 0.55rem;
+    margin-bottom: 6px;
+  }
+
+  /* Empty state improvements */
+  .canvas-empty {
+    padding: 20px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .shortcuts-guide {
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .guide-title {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+  }
+
+  .shortcuts-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .shortcut-item {
+    padding: 10px;
+  }
+
+  .shortcut-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .shortcut-key {
+    font-size: 0.75rem;
+  }
+
+  .shortcut-desc {
+    font-size: 0.65rem;
+  }
+
+  .empty-quick-add {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .empty-quick-add span {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .quick-add-btn {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+  }
+
+  /* Status toast improvements */
+  .status-toast {
+    left: 16px;
+    right: 16px;
+    transform: none;
+    min-width: auto;
+    padding: 12px 16px;
+    border-radius: 12px;
+  }
+
+  /* Modal improvements */
+  .modal-container {
+    margin: 16px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .modal-header {
+    padding: 20px;
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+
+  .modal-footer {
+    padding: 16px 20px;
+  }
+
+  /* Dropdown improvements */
+  .dropdown-panel {
+    position: fixed;
+    top: auto;
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    min-width: auto;
+    max-height: 60vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .workflow-header {
+    padding: 8px 10px;
+  }
+
+  .action-btn.primary.run {
+    padding: 8px 12px;
+  }
+
+  .action-btn.primary.run span {
+    font-size: 0.75rem;
+  }
+
+  /* Context menu - 3 columns on small screens */
+  .context-menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  .canvas-context-menu {
+    width: calc(100vw - 20px);
+    max-height: 85vh;
+  }
+
+  .context-menu-scroll {
+    padding: 6px;
+  }
+
+  .context-node-btn {
+    padding: 6px 2px;
+    min-height: 56px;
+  }
+
+  .context-node-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .context-node-icon :deep(svg) {
+    width: 15px;
+    height: 15px;
+  }
+
+  .context-node-label {
+    font-size: 0.5rem;
+    letter-spacing: 0;
+  }
+
+  /* Shortcuts guide mobile */
+  .shortcuts-guide {
+    padding: 16px;
+  }
+
+  .guide-title {
+    font-size: 1rem;
+  }
+
+  .shortcut-item {
+    padding: 8px;
+  }
+
+  /* Touch improvements */
+  .context-node-btn,
+  .quick-add-btn,
+  .action-btn,
+  .zoom-btn {
+    min-height: 44px; /* iOS touch target */
+  }
 }
 </style>

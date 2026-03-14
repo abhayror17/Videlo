@@ -8,7 +8,9 @@
     </button>
     <div class="node-header">
       <div class="node-icon-wrapper">
-        <span class="node-icon">📝</span>
+        <div class="node-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
       </div>
       <span class="node-title">{{ $t('workflow.textPrompt') }}</span>
       <div v-if="localText" class="node-status filled"></div>
@@ -60,46 +62,48 @@ const deleteNode = () => {
 <style scoped>
 .workflow-node {
   position: relative;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
   min-width: 240px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .workflow-node:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
 }
 
 .node-delete-btn {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 22px;
-  height: 22px;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(239, 68, 68, 0.9);
-  border: 2px solid var(--bg-panel);
-  border-radius: 50%;
-  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #EF4444;
   cursor: pointer;
   opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   z-index: 10;
 }
 
 .workflow-node:hover .node-delete-btn {
   opacity: 1;
-  transform: scale(1);
 }
 
 .node-delete-btn:hover {
-  background: #EF4444;
+  background: rgba(239, 68, 68, 0.1);
   transform: scale(1.1);
 }
 
@@ -111,34 +115,36 @@ const deleteNode = () => {
 .node-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: 12px 12px 0 0;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .node-icon-wrapper {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.1));
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(99, 102, 241, 0.1));
+  border-radius: 10px;
+  color: #A5B4FC;
 }
 
-.node-icon {
-  font-size: 1rem;
+.node-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .node-title {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: #A5B4FC;
+  font-weight: 700;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   flex: 1;
+  opacity: 0.9;
 }
 
 .node-status {
@@ -161,10 +167,10 @@ const deleteNode = () => {
 .node-textarea {
   width: 100%;
   padding: 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 0.8125rem;
   line-height: 1.5;
   resize: none;
@@ -174,8 +180,8 @@ const deleteNode = () => {
 
 .node-textarea:focus {
   outline: none;
-  border-color: #6366F1;
-  background: var(--bg-elevated);
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .node-textarea::placeholder {
@@ -189,23 +195,27 @@ const deleteNode = () => {
 }
 
 .char-count {
-  font-size: 0.6875rem;
-  color: #4B5563;
-  transition: color 0.2s ease;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .char-count.has-content {
-  color: #6B7280;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .node-handle {
-  width: 14px !important;
-  height: 14px !important;
-  background: #6366F1 !important;
-  border: 2px solid var(--bg-panel) !important;
+  width: 10px !important;
+  height: 10px !important;
+  background: #1A1A1A !important;
+  border: 2px solid #6366F1 !important;
+  transition: all 0.2s ease;
 }
 
 .node-handle:hover {
-  transform: scale(1.2);
+  transform: scale(1.3);
+  background: #6366F1 !important;
 }
 </style>

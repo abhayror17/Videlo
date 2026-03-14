@@ -219,6 +219,30 @@ export default {
     sectionGenerate: 'Generate',
     sectionTransform: 'Transform',
     sectionOutput: 'Output',
-    save: 'Save'
+    save: 'Save',
+    // New shortcuts and features
+    undo: 'Undo',
+    redo: 'Redo',
+    cutConnection: 'Cut Connection',
+    deleteConnection: 'Delete Connection',
+    keyboardShortcuts: 'Keyboard Shortcuts',
+    shortcutsGuide: 'Shortcuts Guide',
+    gettingStarted: 'Getting Started',
+    infiniteZoom: 'Infinite Zoom',
+    rightClickMenu: 'Right Click Menu',
+    dragToConnect: 'Drag to Connect',
+    selectToCut: 'Select + Click to Cut',
+    addNode: 'Add Node',
+    quickStart: 'Quick Start',
+    settings: 'Settings',
+    zoom: 'Zoom',
+    pan: 'Pan',
+    // Empty state guide
+    scrollToZoom: 'Scroll to Zoom',
+    rightClickForMenu: 'Right Click for Menu',
+    ctrlZToUndo: 'Ctrl+Z to Undo',
+    settingsForKey: 'Add API Key in Settings',
+    dragToConnectNodes: 'Drag to Connect Nodes',
+    selectAndClickX: 'Select + Click ✕ to Cut'
   }
 }

@@ -8,7 +8,9 @@
     </button>
     <div class="node-header">
       <div class="node-icon-wrapper">
-        <span class="node-icon">🔊</span>
+        <div class="node-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        </div>
       </div>
       <span class="node-title">{{ $t('workflow.textToSpeech') }}</span>
       <div v-if="isProcessing" class="node-spinner"></div>
@@ -90,52 +92,53 @@ const deleteNode = () => {
 <style scoped>
 .workflow-node {
   position: relative;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  min-width: 240px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease;
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  min-width: 260px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .workflow-node:hover {
-  border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.15);
+  transform: translateY(-2px);
 }
 
 .workflow-node.processing {
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+  border-color: #8B5CF6;
 }
 
 .node-delete-btn {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 22px;
-  height: 22px;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(239, 68, 68, 0.9);
-  border: 2px solid var(--bg-panel);
-  border-radius: 50%;
-  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #EF4444;
   cursor: pointer;
   opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   z-index: 10;
 }
 
 .workflow-node:hover .node-delete-btn {
   opacity: 1;
-  transform: scale(1);
 }
 
 .node-delete-btn:hover {
-  background: #EF4444;
-  transform: scale(1.1);
+  background: rgba(239, 68, 68, 0.9);
+  transform: scale(1.05);
 }
 
 .node-delete-btn svg {
@@ -146,34 +149,36 @@ const deleteNode = () => {
 .node-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: 12px 12px 0 0;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .node-icon-wrapper {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(139, 92, 246, 0.1));
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1));
+  border-radius: 10px;
+  color: #A78BFA;
 }
 
-.node-icon {
-  font-size: 1rem;
+.node-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .node-title {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: #A78BFA;
+  font-weight: 700;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   flex: 1;
+  opacity: 0.9;
 }
 
 .node-status {
@@ -189,8 +194,8 @@ const deleteNode = () => {
 }
 
 .node-spinner {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(139, 92, 246, 0.2);
   border-top-color: #8B5CF6;
   border-radius: 50%;
@@ -206,7 +211,7 @@ const deleteNode = () => {
 }
 
 .form-row {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .form-row:last-child {
@@ -215,29 +220,45 @@ const deleteNode = () => {
 
 .form-row label {
   display: block;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #6B7280;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
 }
 
 .form-select {
   width: 100%;
-  padding: 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  padding: 10px 32px 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 0.8125rem;
+  font-family: inherit;
   transition: all 0.2s ease;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+}
+
+.form-select option {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 10px;
+  font-size: 0.875rem;
 }
 
 .form-select:focus {
   outline: none;
-  border-color: #8B5CF6;
-  background: var(--bg-elevated);
+  border-color: rgba(139, 92, 246, 0.6);
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 .slider-wrapper {
@@ -249,7 +270,7 @@ const deleteNode = () => {
 .form-slider {
   flex: 1;
   height: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   appearance: none;
   cursor: pointer;
@@ -262,34 +283,35 @@ const deleteNode = () => {
   background: linear-gradient(135deg, #8B5CF6, #A78BFA);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
 }
 
 .slider-value {
   min-width: 36px;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: #A78BFA;
   text-align: right;
 }
 
 .result-preview.audio {
-  margin-top: 14px;
+  margin-top: 16px;
   padding: 16px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05));
-  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.1);
+  border-radius: 12px;
   text-align: center;
 }
 
 .audio-visualizer {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .audio-bars {
   display: inline-flex;
   align-items: flex-end;
   gap: 3px;
-  height: 28px;
+  height: 32px;
 }
 
 .audio-bars i {
@@ -307,19 +329,26 @@ const deleteNode = () => {
 
 @keyframes audioBar {
   0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(0.5); }
+  50% { transform: scaleY(0.4); }
 }
 
 .result-preview.audio audio {
   width: 100%;
   height: 40px;
-  border-radius: 8px;
+  border-radius: 10px;
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .node-handle {
-  width: 14px !important;
-  height: 14px !important;
+  width: 10px !important;
+  height: 10px !important;
+  background: #1A1A1A !important;
+  border: 2px solid #8B5CF6 !important;
+  transition: all 0.2s ease;
+}
+
+.node-handle:hover {
+  transform: scale(1.3);
   background: #8B5CF6 !important;
-  border: 2px solid var(--bg-panel) !important;
 }
 </style>
