@@ -489,11 +489,12 @@ export default {
       selectedLighting: 'natural',
       aspectRatio: '1:1',
       
-      // Step 4 data
-      generating: false,
-      generatedImage: null,
-      showPromptEditor: false,
-      editedPrompt: '',
+// Step 4 data
+    generating: false,
+    generatedImage: null,
+    showPromptEditor: false,
+    editedPrompt: '',
+    useEditedPrompt: false,
       
       // Template data
       adTypes,
@@ -661,13 +662,13 @@ export default {
       return `${params.productName || 'Product'} on ${params.surface}, ${params.composition}, ${params.lighting}, ${params.style} aesthetic, professional quality`
     },
     
-    applyEditedPrompt() {
+applyEditedPrompt() {
       this.showPromptEditor = false
+      this.useEditedPrompt = true
     },
-    
-    // Generation
+
     async generateImage() {
-      const prompt = this.showPromptEditor ? this.editedPrompt : this.generatedPrompt
+      const prompt = this.useEditedPrompt ? this.editedPrompt : this.generatedPrompt
       
       this.generating = true
       this.generatedImage = null
@@ -680,11 +681,13 @@ export default {
           reference_images: this.referenceImage ? [this.referenceImage] : null
         })
         
-        if (result.image_urls && result.image_urls.length > 0) {
-          this.generatedImage = result.image_urls[0]
-        } else if (result.error) {
-          alert(result.error)
-        }
+if (result.error) {
+        alert(result.error)
+      } else if (result.image_urls && result.image_urls.length > 0) {
+        this.generatedImage = result.image_urls[0]
+      } else {
+        alert('No image generated')
+      }
       } catch (error) {
         console.error('Generation failed:', error)
         alert('Failed to generate image: ' + (error.response?.data?.detail || error.message))
@@ -726,6 +729,7 @@ export default {
   watch: {
     generatedPrompt(newVal) {
       this.editedPrompt = newVal
+      this.useEditedPrompt = false
     }
   }
 }

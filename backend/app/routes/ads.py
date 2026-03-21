@@ -1146,3 +1146,164 @@ async def get_ad_campaign_legacy(
 ):
     """Legacy endpoint - gets campaign."""
     return await get_campaign(campaign_id, db)
+
+
+# ==============================================================================
+# PHASE 7.5: EXECUTE IMAGE GENERATION
+# ==============================================================================
+
+@router.post("/ads/campaigns/{campaign_id}/generate-images")
+async def execute_image_generation(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Execute actual image generation for all scene prompts (Phase 7.5).
+    
+    Uses deAPI to generate images from the prompts created in Phase 7.
+    """
+    from ..models import Generation
+    
+    campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
+        AdStoryboard.campaign_id == campaign_id
+    ).all()
+    
+    if not scene_prompts:
+        raise HTTPException(status_code=400, detail="No scene prompts found. Complete Phase 7 first.")
+    
+    campaign.image_prompts_status = "processing"
+    db.commit()
+    
+    client = get_pipeline_client()
+    results = []
+    
+    for scene_prompt in scene_prompts:
+        if scene_prompt.image_prompt and scene_prompt.image_status == "pending":
+            try:
+                result = await client.submit_text2img(scene_prompt.image_prompt)
+                
+                generation = Generation(
+                    prompt=scene_prompt.image_prompt,
+                    generation_type="text2img",
+                    model="ZImageTurbo_INT8",
+                    status="completed",
+                    remote_url=result.get("url") or result.get("image_url")
+                )
+                db.add(generation)
+                db.commit()
+                db.refresh(generation)
+                
+                scene_prompt.image_generation_id = generation.id
+                scene_prompt.image_url = generation.remote_url
+                scene_prompt.image_status = "completed"
+                db.commit()
+                
+                results.append({
+                    "scene_num": scene_prompt.scene_num,
+                    "image_url": scene_prompt.image_url,
+                    "status": "completed"
+                })
+            except Exception as e:
+                scene_prompt.image_status = "failed"
+                db.commit()
+                results.append({
+                    "scene_num": scene_prompt.scene_num,
+                    "status": "failed",
+                    "error": str(e)
+                })
+    
+    campaign.image_prompts_status = "completed"
+    db.commit()
+    
+    return {
+        "campaign_id": campaign_id,
+        "phase": "7.5",
+        "results": results
+    }
+
+
+# ==============================================================================
+# PHASE 8.5: EXECUTE VIDEO GENERATION
+# ==============================================================================
+
+@router.post("/ads/campaigns/{campaign_id}/generate-videos")
+async def execute_video_generation(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Execute actual video generation for all scene prompts (Phase 8.5).
+    
+    Uses deAPI to generate videos from the images and prompts.
+    """
+    from ..models import Generation
+    
+    campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
+        AdStoryboard.campaign_id == campaign_id,
+        AdScenePrompt.image_status == "completed"
+    ).all()
+    
+    if not scene_prompts:
+        raise HTTPException(status_code=400, detail="No completed images found. Run Phase 7.5 first.")
+    
+    campaign.video_prompts_status = "processing"
+    db.commit()
+    
+    client = get_pipeline_client()
+    results = []
+    
+    for scene_prompt in scene_prompts:
+        if scene_prompt.video_prompt and scene_prompt.image_url and scene_prompt.video_status == "pending":
+            try:
+                result = await client.submit_img2video(
+                    image_url=scene_prompt.image_url,
+                    prompt=scene_prompt.video_prompt
+                )
+                
+                generation = Generation(
+                    prompt=scene_prompt.video_prompt,
+                    generation_type="img2video",
+                    model="Ltx2_19B_Dist_FP8",
+                    status="completed",
+                    remote_url=result.get("url") or result.get("video_url")
+                )
+                db.add(generation)
+                db.commit()
+                db.refresh(generation)
+                
+                scene_prompt.video_generation_id = generation.id
+                scene_prompt.video_url = generation.remote_url
+                scene_prompt.video_status = "completed"
+                db.commit()
+                
+                results.append({
+                    "scene_num": scene_prompt.scene_num,
+                    "video_url": scene_prompt.video_url,
+                    "status": "completed"
+                })
+            except Exception as e:
+                scene_prompt.video_status = "failed"
+                db.commit()
+                results.append({
+                    "scene_num": scene_prompt.scene_num,
+                    "status": "failed",
+                    "error": str(e)
+                })
+    
+    campaign.video_prompts_status = "completed"
+    campaign.overall_status = "completed"
+    db.commit()
+    
+    return {
+        "campaign_id": campaign_id,
+        "phase": "8.5",
+        "results": results
+    }

@@ -390,7 +390,8 @@ async def call_llm(system_prompt: str, user_message: str, temperature: float = 0
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
             ],
-            temperature=temperature
+            temperature=temperature,
+            timeout=120.0
         )
         
         response_text = completion.choices[0].message.content.strip()
