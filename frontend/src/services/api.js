@@ -8,11 +8,15 @@ const api = axios.create({
   timeout: 30000
 })
 
-// Add custom API key header if user has provided one (BYOK)
+// Add custom API key headers if user has provided them (BYOK)
 api.interceptors.request.use(config => {
   const customKey = localStorage.getItem('deapi_key')
   if (customKey) {
     config.headers['X-DeAPI-Key'] = customKey
+  }
+  const iflowKey = localStorage.getItem('iflow_key')
+  if (iflowKey) {
+    config.headers['X-iFlow-Key'] = iflowKey
   }
   return config
 })
@@ -165,12 +169,6 @@ export default {
     return response.data
   },
 
-  // Get balance
-  async getBalance() {
-    const response = await api.get('/balance')
-    return response.data
-  },
-
   // List models
   async getModels(inferenceType = null) {
     const params = {}
@@ -205,15 +203,15 @@ export default {
   // AI Ads Generator APIs
   // Create a new ad campaign
   async createAdCampaign(data) {
-    const response = await api.post('/ads/generate', data, {
-      timeout: 30000
+    const response = await api.post('/ads/campaigns', data, {
+      timeout: 60000
     })
     return response.data
   },
 
   // Get list of ad campaigns
   async getAdCampaigns(page = 1, perPage = 10) {
-    const response = await api.get('/ads', {
+    const response = await api.get('/ads/campaigns', {
       params: { page, per_page: perPage }
     })
     return response.data
@@ -221,21 +219,117 @@ export default {
 
   // Get a specific ad campaign
   async getAdCampaign(campaignId) {
-    const response = await api.get(`/ads/${campaignId}`)
+    const response = await api.get(`/ads/campaigns/${campaignId}`)
     return response.data
   },
 
   // Get campaign status (for polling)
   async getAdCampaignStatus(campaignId) {
-    const response = await api.get(`/ads/${campaignId}/status`)
+    const response = await api.get(`/ads/campaigns/${campaignId}`)
     return response.data
   },
 
-  // Redo a specific step
+  // Get full campaign details with avatars and scripts
+  async getAdCampaignDetail(campaignId) {
+    const response = await api.get(`/ads/campaigns/${campaignId}/detail`)
+    return response.data
+  },
+
+  // Phase 2: Submit answers to clarification questions
+  async submitAdCampaignAnswers(campaignId, answers) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/answers`, {
+      answers
+    })
+    return response.data
+  },
+
+  // Phase 4: Generate scripts
+  async generateAdScripts(campaignId, options = {}) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/scripts`, {
+      num_scripts: options.numScripts || 5
+    })
+    return response.data
+  },
+
+  // Phase 5: Generate avatars
+  async generateAdAvatars(campaignId, numAvatars = 3) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/avatars`, null, {
+      params: { num_avatars: numAvatars }
+    })
+    return response.data
+  },
+
+  // Phase 6-8: Generate storyboards and prompts
+  async generateAdStoryboards(campaignId) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/storyboards`)
+    return response.data
+  },
+
+  async generateAdImagePrompts(campaignId) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/image-prompts`)
+    return response.data
+  },
+
+  async generateAdVideoPrompts(campaignId) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/video-prompts`)
+    return response.data
+  },
+
+  // Phase 9: Get batch output
+  async getAdCampaignBatch(campaignId) {
+    const response = await api.get(`/ads/campaigns/${campaignId}/batch`)
+    return response.data
+  },
+
+  // Convenience: Generate all remaining phases
+  async generateAllAdCampaign(campaignId, options = {}) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/generate-all`, null, {
+      params: {
+        num_scripts: options.numScripts || 5,
+        num_avatars: options.numAvatars || 3
+      },
+      timeout: 120000
+    })
+    return response.data
+  },
+
+  // Phase 10: Iteration mode
+  async iterateAdCampaign(campaignId, command, target = null) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/iterate`, {
+      command,
+      target
+    })
+    return response.data
+  },
+
+  // Redo a specific step (uses iteration mode)
   async redoAdCampaignStep(campaignId, step, feedback = null) {
-    const response = await api.post(`/ads/${campaignId}/redo`, {
-      step,
-      feedback
+    const command = feedback || `regenerate ${step}`
+    const response = await api.post(`/ads/campaigns/${campaignId}/iterate`, {
+      command,
+      target: step
+    })
+    return response.data
+  },
+
+  // Redo/restart from a specific phase
+  async redoCampaignPhase(campaignId, phase) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/redo/${phase}`, null, {
+      timeout: 120000
+    })
+    return response.data
+  },
+
+  // Get debug logs for a campaign
+  async getAdCampaignDebugLogs(campaignId) {
+    const response = await api.get(`/ads/campaigns/${campaignId}/debug-logs`)
+    return response.data
+  },
+
+  // Update campaign input (prompt, brand, answers)
+  async updateAdCampaignInput(campaignId, data) {
+    const response = await api.put(`/ads/campaigns/${campaignId}/input`, null, {
+      params: data
     })
     return response.data
   },
@@ -328,38 +422,44 @@ export default {
   },
 
   // ============================================================
-  // CREDIT SYSTEM APIs
+  // NANOBANANA IMAGE GENERATION (Free/Guest Mode)
   // ============================================================
 
-  // Check credits for a generation
-  async checkCredits(generationType, model, options = {}) {
-    const response = await api.post('/credits/check', {
-      generation_type: generationType,
-      model: model,
-      width: options.width,
-      height: options.height,
-      frames: options.frames,
-      text_length: options.textLength,
-      duration: options.duration
+  // Generate image with NanoBanana (free, no credits required)
+  async generateNanoBanana(data) {
+    const response = await api.post('/generate/nanobanana', {
+      prompt: data.prompt,
+      model: data.model || 'nano-banana-2',
+      aspect_ratio: data.aspect_ratio || '1:1',
+      reference_images: data.reference_images || null
+    }, {
+      timeout: 150000 // 2.5 minutes timeout
     })
     return response.data
   },
 
-  // Get user's credit balance
-  async getCreditBalance() {
-    const response = await api.get('/credits/balance')
+  // Start NanoBanana generation (async, returns task ID)
+  async startNanoBanana(data) {
+    const response = await api.post('/generate/nanobanana/start', {
+      prompt: data.prompt,
+      model: data.model || 'nano-banana-2',
+      aspect_ratio: data.aspect_ratio || '1:1',
+      reference_images: data.reference_images || null
+    })
     return response.data
   },
 
-  // Get available credit packages
-  async getCreditPackages() {
-    const response = await api.get('/credits/packages')
-    return response.data
-  },
-
-  // Add demo credits (for testing)
-  async addDemoCredits() {
-    const response = await api.post('/credits/add-demo')
+  // Query NanoBanana task status
+  async queryNanoBanana(taskId, prompt) {
+    const formData = new FormData()
+    formData.append('task_id', taskId)
+    formData.append('prompt', prompt)
+    
+    const response = await api.post('/generate/nanobanana/query', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
     return response.data
   }
 }

@@ -66,6 +66,24 @@ class Txt2MusicRequest(BaseModel):
 
 
 # ============================================================
+# TEXT-TO-AUDIO / TTS
+# ============================================================
+
+class Txt2AudioRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=10001, description="Text to convert to speech")
+    model: str = Field("Kokoro", description="TTS model: Kokoro, Chatterbox, Qwen3_TTS_12Hz_1_7B_CustomVoice, Qwen3_TTS_12Hz_1_7B_Base, Qwen3_TTS_12Hz_1_7B_VoiceDesign")
+    voice: Optional[str] = Field(None, description="Voice ID (model-specific)")
+    lang: str = Field("en-us", description="Language code")
+    speed: float = Field(1.0, ge=0.5, le=2.0, description="Speech speed")
+    format: str = Field("mp3", description="Output format: mp3, flac, wav")
+    sample_rate: int = Field(24000, description="Sample rate in Hz")
+    mode: str = Field("custom_voice", description="Mode: custom_voice, voice_clone, voice_design")
+    ref_audio: Optional[str] = Field(None, description="Reference audio URL for voice cloning")
+    ref_text: Optional[str] = Field(None, description="Reference text for voice cloning")
+    instruct: Optional[str] = Field(None, description="Voice design instructions")
+
+
+# ============================================================
 # TEXT-TO-EMBEDDING
 # ============================================================
 
@@ -159,6 +177,24 @@ class PromptEnhanceResponse(BaseModel):
 
 
 # ============================================================
+# NANOBANANA IMAGE GENERATION
+# ============================================================
+
+class NanoBananaRequest(BaseModel):
+    prompt: str = Field(..., min_length=3, description="Text prompt for image generation")
+    model: str = Field("nano-banana-2", description="Model: nano-banana-2 or nano-banana-pro")
+    aspect_ratio: str = Field("1:1", description="Aspect ratio: 1:1, 16:9, 9:16, 3:4, 4:3")
+    reference_images: Optional[List[str]] = Field(None, description="Reference image URLs for image-to-image")
+
+
+class NanoBananaResponse(BaseModel):
+    task_id: str
+    status: str
+    image_urls: List[str] = []
+    error: Optional[str] = None
+
+
+# ============================================================
 # GENERATION (Legacy/Combined)
 # ============================================================
 
@@ -200,7 +236,6 @@ class GenerationResponse(BaseModel):
     guidance: Optional[float] = None
     steps: Optional[int] = None
     seed: Optional[int] = None
-    credits_charged: Optional[int] = None
     status: str
     progress: int = 0
     remote_url: Optional[str] = None
@@ -236,11 +271,171 @@ class BalanceResponse(BaseModel):
 
 
 # ============================================================
-# AI ADS GENERATOR
+# AI ADS GENERATOR - MULTI-PHASE WORKFLOW
 # ============================================================
 
+# Phase 1: Clarification Questions
+class ClarificationQuestion(BaseModel):
+    id: str
+    question: str
+    type: Literal["text", "select", "multiselect"] = "text"
+    options: Optional[List[str]] = None
+
+
+class ClarificationQuestionsResponse(BaseModel):
+    campaign_id: int
+    phase: int = 1
+    questions: List[ClarificationQuestion]
+
+
+class ClarificationAnswer(BaseModel):
+    question_id: str
+    answer: Union[str, List[str]]
+
+
+class ClarificationAnswersRequest(BaseModel):
+    answers: List[ClarificationAnswer]
+
+
+# Phase 2: Structured Context
+class AvatarPreferences(BaseModel):
+    gender: Optional[str] = None
+    age_range: Optional[str] = None
+    persona: Optional[str] = None
+
+
+class AdContext(BaseModel):
+    brand: str = ""
+    product: str = ""
+    target_audience: str = ""
+    platform: str = ""
+    hooks: List[str] = []
+    tone: str = ""
+    ad_angles: List[str] = []
+    avatar_preferences: Optional[AvatarPreferences] = None
+    constraints: List[str] = []
+
+
+# Phase 3: Ad Strategy/Angles
+class AdAngle(BaseModel):
+    id: int
+    hook_idea: str
+    emotional_trigger: str
+    why_convert: str
+
+
+class AdStrategyResponse(BaseModel):
+    campaign_id: int
+    phase: int = 3
+    angles: List[AdAngle]
+
+
+# Phase 4: Script Generation
+class ScriptScene(BaseModel):
+    scene: int
+    dialogue: str
+    visual: str
+    duration: str
+
+
+class AdScriptData(BaseModel):
+    id: int
+    hook: str
+    scenes: List[ScriptScene]
+    cta: str
+
+
+class ScriptsGenerateRequest(BaseModel):
+    num_scripts: int = Field(5, ge=1, le=20, description="Number of scripts to generate")
+
+
+class ScriptsResponse(BaseModel):
+    campaign_id: int
+    phase: int = 4
+    scripts: List[AdScriptData]
+
+
+# Phase 5: Avatar Generation
+class AdAvatarData(BaseModel):
+    id: int
+    name: str
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    region: Optional[str] = None
+    appearance: str
+    outfit_style: str
+    personality_vibe: str
+
+
+class AvatarsResponse(BaseModel):
+    campaign_id: int
+    phase: int = 5
+    avatars: List[AdAvatarData]
+
+
+# Phase 6: Storyboard
+class StoryboardScene(BaseModel):
+    scene_num: int
+    visual_direction: str
+    camera_angle: str
+    lighting: str
+    emotion: str
+    environment: str
+
+
+class StoryboardResponse(BaseModel):
+    campaign_id: int
+    script_id: int
+    phase: int = 6
+    scenes: List[StoryboardScene]
+
+
+# Phase 7-8: Image/Video Prompts
+class ScenePromptData(BaseModel):
+    scene_num: int
+    image_prompt: Optional[str] = None
+    video_prompt: Optional[str] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    image_status: str = "pending"
+    video_status: str = "pending"
+
+
+class PromptsResponse(BaseModel):
+    campaign_id: int
+    script_id: int
+    phase: int = 7  # or 8
+    scenes: List[ScenePromptData]
+
+
+# Phase 9: Batch Output
+class BatchOutputResponse(BaseModel):
+    campaign_id: int
+    phase: int = 9
+    context: AdContext
+    avatars: List[AdAvatarData]
+    scripts: List[AdScriptData]
+    storyboards: List[dict]
+    image_prompts: List[dict]
+    video_prompts: List[dict]
+
+
+# Phase 10: Iteration Mode
+class IterationRequest(BaseModel):
+    command: str = Field(..., description="Iteration command, e.g., 'make it funnier', 'change avatar', 'target gym audience'")
+    target: Optional[str] = Field(None, description="Target to modify: 'scripts', 'avatars', 'hooks', 'all'")
+
+
+class IterationResponse(BaseModel):
+    campaign_id: int
+    iteration_count: int
+    changes_made: str
+    updated_data: dict
+
+
+# Campaign Creation & Management
 class AdCampaignCreate(BaseModel):
-    user_prompt: str = Field(..., min_length=10, description="User's ad concept/idea")
+    user_prompt: str = Field(..., min_length=5, description="User's ad concept/idea")
     brand_name: Optional[str] = Field(None, description="Brand name for the ad")
     brand_description: Optional[str] = Field(None, description="Brief brand description")
 
@@ -248,42 +443,42 @@ class AdCampaignCreate(BaseModel):
 class AdCampaignResponse(BaseModel):
     id: int
     user_prompt: str
-    brand_name: Optional[str] = None
-    brand_description: Optional[str] = None
     
-    # Pipeline status
-    current_step: str = "init"
+    # Current workflow phase
+    current_phase: int = 1
+    phase_status: str = "pending"
     
-    # Enhancement
-    enhanced_prompt: Optional[str] = None
-    enhancement_status: str = "pending"
+    # Clarification questions
+    clarification_questions: Optional[List[dict]] = None
+    user_answers: Optional[List[dict]] = None
     
-    # Script
-    script: Optional[str] = None
-    script_status: str = "pending"
-    script_feedback: Optional[str] = None
+    # Structured context
+    context: Optional[dict] = None
     
-    # Image
-    image_url: Optional[str] = None
-    image_status: str = "pending"
-    image_feedback: Optional[str] = None
+    # Ad strategy
+    ad_angles: Optional[List[dict]] = None
     
-    # Video
-    video_url: Optional[str] = None
-    video_status: str = "pending"
-    video_feedback: Optional[str] = None
+    # Generation settings
+    num_scripts: int = 5
+    num_avatars: int = 3
     
-    # QA
-    qa_status: str = "pending"
-    qa_feedback: Optional[str] = None
-    qa_details: Optional[str] = None
-    qa_iterations: int = 0
+    # Status tracking
+    scripts_status: str = "pending"
+    avatars_status: str = "pending"
+    storyboards_status: str = "pending"
+    image_prompts_status: str = "pending"
+    video_prompts_status: str = "pending"
+    
+    # Iteration
+    iteration_count: int = 0
+    last_iteration_command: Optional[str] = None
     
     # Overall
     overall_status: str = "pending"
     error_message: Optional[str] = None
     
     created_at: datetime
+    updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
     class Config:
@@ -291,69 +486,19 @@ class AdCampaignResponse(BaseModel):
 
 
 class AdCampaignListResponse(BaseModel):
-    items: list[AdCampaignResponse]
+    items: List[AdCampaignResponse]
     total: int
     page: int
     pages: int
 
 
+class AdCampaignDetailResponse(AdCampaignResponse):
+    """Full campaign details with all related data."""
+    avatars: List[AdAvatarData] = []
+    scripts: List[dict] = []
+
+
+# Legacy support (deprecated - will be removed)
 class RedoRequest(BaseModel):
     step: Literal["script", "image", "video"] = Field(..., description="Which step to redo")
     feedback: Optional[str] = Field(None, description="Additional feedback for the redo")
-
-
-# ============================================================
-# CREDIT SYSTEM
-# ============================================================
-
-class CreditCheckRequest(BaseModel):
-    """Request to estimate credits for a generation."""
-    generation_type: str = Field(..., description="Type of generation: txt2img, txt2video, img2video, etc.")
-    model: str = Field(..., description="Model slug/ID")
-    width: Optional[int] = Field(None, description="Width in pixels")
-    height: Optional[int] = Field(None, description="Height in pixels")
-    frames: Optional[int] = Field(None, description="Number of frames (for video)")
-    text_length: Optional[int] = Field(None, description="Text length (for TTS)")
-    duration: Optional[int] = Field(None, description="Duration in seconds (for music/transcription)")
-
-
-class CreditBreakdownResponse(BaseModel):
-    """Detailed credit breakdown for display."""
-    credits: int
-    model: str
-    model_name: str
-    description: str
-    parameters: dict
-
-
-class CreditCheckResponse(BaseModel):
-    """Response for credit check endpoint."""
-    credits_required: int
-    user_balance: int
-    sufficient: bool
-    breakdown: CreditBreakdownResponse
-
-
-class UserCreditsResponse(BaseModel):
-    """Response for user credits endpoint."""
-    credits_balance: int
-    total_credits_purchased: int
-    total_credits_used: int
-
-
-class CreditPackageResponse(BaseModel):
-    """Credit package for purchase."""
-    id: int
-    name: str
-    credits: int
-    price_cents: int
-    bonus_percent: int
-    price_display: str  # e.g., "$1.00"
-
-    class Config:
-        from_attributes = True
-
-
-class CreditPackagesListResponse(BaseModel):
-    """List of available credit packages."""
-    packages: list[CreditPackageResponse]

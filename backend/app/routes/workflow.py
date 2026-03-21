@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import networkx as nx
 
 from ..services.deapi import get_deapi_client
+from ..services.iflow import get_iflow_client
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
 
@@ -44,7 +45,7 @@ class ExecutionStatus(BaseModel):
     error: Optional[str] = None
 
 
-async def execute_graph_task(execution_id: str, graph_data: GraphPayload, custom_api_key: Optional[str] = None):
+async def execute_graph_task(execution_id: str, graph_data: GraphPayload, custom_api_key: Optional[str] = None, custom_iflow_key: Optional[str] = None):
     """
     Background task to execute the workflow graph.
     """
@@ -75,6 +76,7 @@ async def execute_graph_task(execution_id: str, graph_data: GraphPayload, custom
         node_outputs: Dict[str, Any] = {}
         # Use custom API key if provided (BYOK), otherwise use default
         api = get_deapi_client(custom_api_key=custom_api_key)
+        iflow_api = get_iflow_client(custom_api_key=custom_iflow_key)
         
         total_nodes = len(execution_order)
         
@@ -87,7 +89,7 @@ async def execute_graph_task(execution_id: str, graph_data: GraphPayload, custom
             executions[execution_id]["message"] = f"Processing node: {node.type}"
             
             try:
-                result = await execute_node(node, G, node_outputs, api)
+                result = await execute_node(node, G, node_outputs, api, iflow_api)
                 node_outputs[node_id] = result
                 executions[execution_id]["node_results"][node_id] = result
                 print(f"[Workflow] Node {node_id} result: status={result.get('status')}, resultUrl={result.get('resultUrl', 'N/A')[:50] if result.get('resultUrl') else 'N/A'}")
@@ -108,7 +110,7 @@ async def execute_graph_task(execution_id: str, graph_data: GraphPayload, custom
         print(f"[Workflow] Execution {execution_id} failed: {str(e)}")
 
 
-async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api) -> dict:
+async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, iflow_api=None) -> dict:
     """
     Execute a single node based on its type.
     """
@@ -751,11 +753,166 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api) -
                     
                     await asyncio.sleep(2)
     
+    elif node_type == "aiAssistant":
+        # AI Assistant node - process text through AI using iFlow API
+        system_prompt = data.get("systemPrompt", "You are a helpful AI assistant.")
+        user_prompt = data.get("userPrompt", "")
+        model = data.get("model", "kimi-k2")
+        
+        # Check for text input from connected nodes
+        for parent_id in incoming_edges:
+            parent_output = node_outputs.get(parent_id, {})
+            if parent_output.get("text"):
+                user_prompt = parent_output["text"]
+                break
+        
+        print(f"[Workflow] aiAssistant - model: {model}, system_prompt: '{system_prompt[:50]}...', user_prompt: '{user_prompt[:50]}...'")
+        
+        if not user_prompt:
+            # No prompt provided
+            result["status"] = "completed"
+            result["response"] = ""
+            result["text"] = ""
+            print(f"[Workflow] aiAssistant - no user prompt provided, skipping")
+        else:
+            result["status"] = "processing"
+            
+            try:
+                # Use iFlow API for AI chat completion
+                if iflow_api:
+                    ai_response = await iflow_api.simple_chat(
+                        user_message=user_prompt,
+                        system_prompt=system_prompt,
+                        model=model,
+                        temperature=0.7,
+                        max_tokens=2000
+                    )
+                    
+                    if ai_response:
+                        result["response"] = ai_response
+                        result["text"] = ai_response  # Pass text to next nodes
+                        result["status"] = "completed"
+                        print(f"[Workflow] aiAssistant completed: response length={len(ai_response)}")
+                    else:
+                        result["status"] = "failed"
+                        result["error"] = "Empty response from AI"
+                else:
+                    # Fallback if iFlow API is not configured
+                    ai_response = f"[AI Assistant - iFlow API not configured]\n\nSystem: {system_prompt}\n\nUser: {user_prompt}\n\nPlease configure iFlow API key to enable AI assistant functionality."
+                    result["response"] = ai_response
+                    result["text"] = ai_response
+                    result["status"] = "completed"
+                    print(f"[Workflow] aiAssistant completed (fallback): iFlow API not configured")
+                
+            except Exception as e:
+                print(f"[Workflow] aiAssistant - ERROR: {str(e)}")
+                result["status"] = "failed"
+                result["error"] = str(e)
+    
+    elif node_type == "imagePromptEnhancer":
+        # Image Prompt Enhancer - enhance prompts for image generation
+        original_prompt = data.get("originalPrompt", "")
+        
+        # Check for text input from connected nodes
+        for parent_id in incoming_edges:
+            parent_output = node_outputs.get(parent_id, {})
+            if parent_output.get("text"):
+                original_prompt = parent_output["text"]
+                break
+            elif parent_output.get("response"):
+                original_prompt = parent_output["response"]
+                break
+        
+        print(f"[Workflow] imagePromptEnhancer - original_prompt: '{original_prompt[:50]}...'")
+        
+        if original_prompt:
+            result["status"] = "processing"
+            
+            try:
+                # Call deAPI prompt enhancement endpoint
+                enhance_result = await api.enhance_prompt_image(prompt=original_prompt)
+                
+                # Get the enhanced prompt from the response
+                enhanced_prompt = enhance_result.get("data", {}).get("enhanced_prompt", "")
+                
+                if enhanced_prompt:
+                    result["enhancedPrompt"] = enhanced_prompt
+                    result["text"] = enhanced_prompt  # Pass to next nodes
+                    result["status"] = "completed"
+                    print(f"[Workflow] imagePromptEnhancer completed: '{enhanced_prompt[:50]}...'")
+                else:
+                    # Fallback: if API doesn't return enhanced prompt, use original
+                    result["enhancedPrompt"] = original_prompt
+                    result["text"] = original_prompt
+                    result["status"] = "completed"
+                    
+            except Exception as e:
+                print(f"[Workflow] imagePromptEnhancer - ERROR: {str(e)}")
+                # Fallback: use original prompt
+                result["enhancedPrompt"] = original_prompt
+                result["text"] = original_prompt
+                result["status"] = "completed"
+    
+    elif node_type == "videoPromptEnhancer":
+        # Video Prompt Enhancer - enhance prompts for video generation
+        original_prompt = data.get("originalPrompt", "")
+        
+        # Check for text input from connected nodes
+        for parent_id in incoming_edges:
+            parent_output = node_outputs.get(parent_id, {})
+            if parent_output.get("text"):
+                original_prompt = parent_output["text"]
+                break
+            elif parent_output.get("response"):
+                original_prompt = parent_output["response"]
+                break
+        
+        print(f"[Workflow] videoPromptEnhancer - original_prompt: '{original_prompt[:50]}...'")
+        
+        if original_prompt:
+            result["status"] = "processing"
+            
+            try:
+                # Call deAPI video prompt enhancement endpoint
+                enhance_result = await api.enhance_prompt_video(prompt=original_prompt)
+                
+                # Get the enhanced prompt from the response
+                enhanced_prompt = enhance_result.get("data", {}).get("enhanced_prompt", "")
+                
+                if enhanced_prompt:
+                    result["enhancedPrompt"] = enhanced_prompt
+                    result["text"] = enhanced_prompt  # Pass to next nodes
+                    result["status"] = "completed"
+                    print(f"[Workflow] videoPromptEnhancer completed: '{enhanced_prompt[:50]}...'")
+                else:
+                    # Fallback: if API doesn't return enhanced prompt, use original
+                    result["enhancedPrompt"] = original_prompt
+                    result["text"] = original_prompt
+                    result["status"] = "completed"
+                    
+            except Exception as e:
+                print(f"[Workflow] videoPromptEnhancer - ERROR: {str(e)}")
+                # Fallback: use original prompt
+                result["enhancedPrompt"] = original_prompt
+                result["text"] = original_prompt
+                result["status"] = "completed"
+    
+    elif node_type == "stickyNote":
+        # Sticky Note - just a canvas annotation, no processing needed
+        # Store the note text and color for persistence
+        result["text"] = data.get("text", "")
+        result["color"] = data.get("color", "yellow")
+        result["status"] = "completed"
+        print(f"[Workflow] stickyNote - stored note with color={result['color']}, text length={len(result['text'])}")
+    
     elif node_type == "output":
         # Output node - just collect the result
         for parent_id in incoming_edges:
             parent_output = node_outputs.get(parent_id, {})
             result["resultUrl"] = parent_output.get("resultUrl")
+            result["text"] = parent_output.get("text", "")
+            result["response"] = parent_output.get("response", "")
+            result["enhancedPrompt"] = parent_output.get("enhancedPrompt", "")
             result["status"] = "completed"
             break
     
@@ -770,10 +927,11 @@ async def execute_workflow(
 ):
     """
     Execute a workflow graph and return an execution ID for polling.
-    Supports BYOK (Bring Your Own Key) via X-DeAPI-Key header.
+    Supports BYOK (Bring Your Own Key) via X-DeAPI-Key and X-iFlow-Key headers.
     """
-    # Check for custom API key in header (BYOK support)
+    # Check for custom API keys in headers (BYOK support)
     custom_api_key = request.headers.get("X-DeAPI-Key")
+    custom_iflow_key = request.headers.get("X-iFlow-Key")
     
     # Generate execution ID
     execution_id = str(uuid.uuid4())
@@ -787,7 +945,8 @@ async def execute_workflow(
         "node_results": {},
         "error": None,
         "created_at": datetime.utcnow().isoformat(),
-        "using_custom_key": bool(custom_api_key)
+        "using_custom_key": bool(custom_api_key),
+        "using_custom_iflow_key": bool(custom_iflow_key)
     }
     
     # Start background execution
@@ -795,7 +954,8 @@ async def execute_workflow(
         execute_graph_task,
         execution_id,
         graph_data,
-        custom_api_key
+        custom_api_key,
+        custom_iflow_key
     )
     
     return {"execution_id": execution_id}

@@ -9,8 +9,11 @@ export default {
     ads: 'AI广告生成器',
     library: '素材库',
     gallery: '作品集',
+    prompts: '提示词库',
     workflow: '工作流构建器',
-    credits: '积分'
+    credits: '积分',
+    imgGen: '图像生成器',
+    adsImgGen: '广告图生成器'
   },
   
   // Header
@@ -46,9 +49,18 @@ export default {
     enterApiKey: '输入您的 deAPI 密钥',
     customKeyActive: '自定义 API 密钥已激活',
     clearKey: '清除密钥',
-    saveKey: '保存密钥'
+    saveKey: '保存密钥',
+    iflowKey: 'iFlow 密钥',
+    enterIflowKey: '输入您的 iFlow 密钥 (if-...)',
+    customIflowKeyActive: '自定义 iFlow 密钥已激活',
+    // TTS Settings
+    language: '语言',
+    voice: '声音',
+    speed: '语速',
+    voiceDesign: '声音设计',
+    voiceDesignPlaceholder: '描述您想要的声音（例如：温暖、专业的女声，英式口音）'
   },
-  
+
   // Home / Generation
   home: {
     clickToUpload: '点击上传图片',
@@ -109,7 +121,54 @@ export default {
     processing: '处理中...',
     previousCampaigns: '历史活动',
     noBrand: '无品牌',
-    failedToStartCampaign: '启动活动失败，请重试'
+    failedToStartCampaign: '启动活动失败，请重试',
+    needsRevision: '需要修改',
+    qaRejected: '质检审核：未通过',
+    qaFeedback: '质检反馈',
+    redoScript: '重做脚本',
+    redoImage: '重做图片',
+    redoVideo: '重做视频',
+    redoing: '重做中...',
+    revisionHint: '选择需要重新生成的步骤',
+    approved: '已通过',
+    // Multi-phase workflow
+    phaseAsk: '询问',
+    phaseContext: '背景',
+    phaseStrategy: '策略',
+    phaseScripts: '脚本',
+    phaseAvatars: '角色',
+    phaseStoryboard: '分镜',
+    phaseImages: '图片',
+    phaseVideos: '视频',
+    phaseComplete: '完成',
+    helpUsUnderstand: '帮助我们了解您的愿景',
+    typeAnswer: '输入您的回答...',
+    selectOption: '选择选项...',
+    continue: '继续',
+    adStrategy: '广告策略',
+    generateScripts: '生成脚本',
+    generatedScripts: '生成的脚本',
+    generatedAvatars: 'UGC角色',
+    hook: '开头钩子',
+    scene: '场景',
+    cta: '行动号召',
+    continueGeneration: '继续生成',
+    viewResults: '查看结果',
+    tryAgain: '重试',
+    processingQuestions: '正在分析您的需求...',
+    processingContext: '正在构建活动背景...',
+    processingStrategy: '正在创建广告策略...',
+    processingScripts: '正在生成脚本...',
+    processingAvatars: '正在创建UGC角色...',
+    processingStoryboard: '正在构建分镜...',
+    processingImages: '正在生成图片提示...',
+    processingVideos: '正在生成视频提示...',
+    processingComplete: '正在完成活动...',
+    confirmRedoPhase: '从该阶段重新开始？这将清除该阶段及之后的所有数据。',
+    redoingPhase: '正在重做阶段...',
+    debugLogs: '调试日志',
+    noLogsYet: '暂无日志',
+    promptTooShort: '请输入至少5个字符描述您的广告创意'
   },
   
   // Gallery
@@ -175,6 +234,10 @@ export default {
     bgRemoval: '背景移除',
     videoToText: '视频转文本',
     imageEnhance: '图片增强',
+    aiAssistant: 'AI助手',
+    imagePromptEnhancer: '图像提示增强器',
+    videoPromptEnhancer: '视频提示增强器',
+    stickyNote: '便利贴',
     output: '输出',
     enterPrompt: '输入您的提示词...',
     describeEdit: '描述编辑效果...',
@@ -192,9 +255,33 @@ export default {
     language: '语言',
     outputFormat: '输出格式',
     extractedText: '提取的文本',
-    deleteNode: '删除节点',
-    duplicateNode: '复制节点',
+    // AI Assistant
+    systemPrompt: '系统提示词',
+    systemPromptPlaceholder: '输入系统指令...',
+    userPrompt: '用户提示词',
+    userPromptPlaceholder: '输入您的消息...',
+    aiResponse: 'AI回复',
+    // Prompt Enhancers
+    originalPrompt: '原始提示词',
+    enterPromptToEnhance: '输入要增强的提示词...',
+    enterVideoPromptToEnhance: '输入要增强的视频提示词...',
+    enhancedPrompt: '增强后的提示词',
     copy: '复制',
+    copied: '已复制!',
+    // Sticky Note
+    stickyNotePlaceholder: '在此输入笔记...',
+    doubleClickToEdit: '双击编辑',
+    pressEnterToSave: '按回车保存',
+    // Export/Import
+    export: '导出',
+    import: '导入',
+    exportSuccess: '工作流导出成功!',
+    importSuccess: '工作流导入成功!',
+    importErrorInvalidFile: '请选择有效的JSON文件',
+    importErrorParse: '解析工作流文件失败',
+    importErrorRead: '读取文件失败',
+    deleteNode: '删除节点',   
+    duplicateNode: '复制节点',
     myWorkflows: '我的工作流',
     saveWorkflow: '保存',
     saveWorkflowTitle: '保存工作流',
@@ -218,6 +305,7 @@ export default {
     sectionInput: '输入',
     sectionGenerate: '生成',
     sectionTransform: '转换',
+    sectionAnnotation: '笔记',
     sectionOutput: '输出',
     save: '保存',
     // New shortcuts and features
@@ -243,6 +331,160 @@ export default {
     ctrlZToUndo: 'Ctrl+Z 撤销',
     settingsForKey: '设置中添加密钥',
     dragToConnectNodes: '拖拽连接节点',
-    selectAndClickX: '选择后点击 ✕ 切断'
+    selectAndClickX: '选择后点击 ✕ 切断',
+    // BYOK Settings
+    bringYourOwnKey: '自带密钥',
+    byokDesc: '使用您自己的 API 密钥替代服务器默认密钥',
+    deapiKey: 'deAPI 密钥',
+    iflowKey: 'iFlow 密钥',
+    iflowDesc: '使用您自己的 iFlow 密钥用于 AI 助手。获取密钥请访问',
+    enterApiKey: '输入您的 deAPI 密钥',
+    enterIflowKey: '输入您的 iFlow 密钥 (if-...)',
+    saveKey: '保存密钥',
+    clearKey: '清除密钥',
+    keySaved: '密钥保存成功!',
+    keyCleared: '密钥已清除',
+    customKeyActive: '自定义 API 密钥已激活'
+  },
+
+  // Prompts Gallery
+  prompts: {
+    title: 'AI提示词库',
+    subtitle: '发现和使用高质量提示词来创作',
+    prompts: '个提示词',
+    searchPlaceholder: '搜索提示词、标签或关键词...',
+    allTags: '全部标签',
+    filteringBy: '筛选条件',
+    clearAll: '清除全部',
+    loading: '加载提示词中...',
+    noResults: '未找到提示词',
+    tryDifferent: '尝试调整搜索或筛选条件',
+    promptText: '提示词',
+    copyPrompt: '复制提示词',
+    copied: '已复制!',
+    model: '模型',
+    id: 'ID',
+    showing: '显示',
+    of: '共',
+    firstPage: '第一页',
+    lastPage: '最后一页',
+    prevPage: '上一页',
+    nextPage: '下一页'
+  },
+
+  // Image Generator (NanoBanana)
+  imgGen: {
+    describeImage: '描述您想要生成的图片...',
+    addReference: '添加参考图片',
+    model: '模型',
+    aspectRatio: '宽高比'
+  },
+
+  // Ads Image Generator
+  adsImgGen: {
+    // Navigation
+    steps: ['广告类型', '产品信息', '风格设置', '生成'],
+    // Step 1: Ad Type
+    selectAdType: '选择广告类型',
+    selectAdTypeDesc: '选择您想创建的静态广告类型',
+    adTypes: {
+      product: '产品展示',
+      social: '社交媒体广告',
+      lifestyle: '生活方式编辑',
+      food: '美食摄影',
+      corporate: '企业/商务',
+      marketing: '内容/营销'
+    },
+    adTypesDesc: {
+      product: '电商风格的产品摄影，干净背景',
+      social: 'Instagram/Facebook广告格式，含文字叠加和CTA',
+      lifestyle: '真实生活方式场景，编辑级质感',
+      food: '餐厅和食品品牌的高端美食摄影',
+      corporate: '商务头像、团队照片、办公环境',
+      marketing: '平铺图、社媒模板、促销内容'
+    },
+    // Step 2: Product Info
+    productInfo: '产品/品牌信息',
+    productInfoDesc: '告诉我们您的产品或品牌信息',
+    productName: '产品/品牌名称',
+    productNamePlaceholder: '例如：高端护肤精华',
+    description: '描述',
+    descriptionPlaceholder: '简要的产品描述或主要特点',
+    headline: '标题',
+    headlinePlaceholder: '例如：新品上市',
+    ctaText: '行动号召文字',
+    ctaPlaceholder: '例如：立即购买、了解更多',
+    subject: '主体/人物',
+    subjectPlaceholder: '例如：年轻职场女性',
+    action: '动作',
+    actionPlaceholder: '例如：使用、享受、展示',
+    setting: '场景/环境',
+    settingPlaceholder: '例如：现代公寓客厅',
+    foodItem: '食品名称',
+    foodItemPlaceholder: '例如：精致汉堡',
+    presentation: '呈现方式',
+    presentationPlaceholder: '例如：放在质朴木板上配装饰',
+    corpSubjectPlaceholder: '例如：穿着深蓝西装的高管',
+    corpSettingPlaceholder: '例如：现代玻璃墙会议室',
+    contentType: '内容类型',
+    referenceImage: '参考图片（可选）',
+    dragDropImage: '拖拽产品图片到此处',
+    orClickUpload: '或点击上传',
+    uploadHint: '上传产品照片以生成风格一致的广告变体',
+    // Step 3: Style
+    styleComposition: '风格与构图',
+    styleCompositionDesc: '自定义广告的视觉风格',
+    visualStyle: '视觉风格',
+    styles: {
+      minimal: '简约干净',
+      luxury: '奢华高端',
+      lifestyle: '自然生活',
+      dramatic: '戏剧大胆',
+      fresh: '清新明亮',
+      editorial: '杂志编辑'
+    },
+    stylesDesc: {
+      minimal: '简洁干净的背景，柔和阴影',
+      luxury: '优雅高端的美感，戏剧性照明',
+      lifestyle: '真实、温暖、亲切的感觉',
+      dramatic: '高对比度、引人注目的视觉效果',
+      fresh: '明亮、通透、乐观的氛围',
+      editorial: '专业杂志级质感'
+    },
+    composition: '构图',
+    compositions: {
+      closeup: '特写',
+      medium: '中景',
+      wide: '全景',
+      overhead: '俯视/平铺',
+      angle: '动态角度',
+      centered: '居中主体'
+    },
+    lighting: '照明',
+    lightingOptions: {
+      natural: '自然窗光',
+      golden: '黄金时刻',
+      studio: '工作室柔光',
+      dramatic: '戏剧光效',
+      highkey: '高调明亮',
+      rim: '轮廓光'
+    },
+    aspectRatio: '宽高比',
+    // Step 4: Generate
+    generateAd: '生成广告',
+    generateAdDesc: '查看提示词并生成广告图片',
+    generatedPrompt: '生成的提示词',
+    editPrompt: '编辑提示词',
+    cancel: '取消',
+    apply: '应用',
+    generating: '生成中...',
+    generatingDesc: '这可能需要2分钟',
+    download: '下载',
+    regenerate: '重新生成',
+    useAsRef: '用作参考',
+    clickGenerate: '点击生成按钮创建您的广告',
+    generate: '生成',
+    back: '上一步',
+    next: '下一步'
   }
 }

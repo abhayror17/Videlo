@@ -66,6 +66,32 @@
           <span>{{ $t('workflow.saveWorkflow') }}</span>
         </button>
 
+        <button class="action-btn" @click="exportWorkflow" :disabled="nodes.length === 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>{{ $t('workflow.export') }}</span>
+        </button>
+
+        <button class="action-btn" @click="triggerImport">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span>{{ $t('workflow.import') }}</span>
+        </button>
+
+        <input
+          ref="importFileInput"
+          type="file"
+          accept=".json"
+          style="display: none"
+          @change="handleImport"
+        />
+
         <button class="action-btn danger" @click="clearCanvas" :disabled="nodes.length === 0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"/>
@@ -173,7 +199,7 @@
                 </button>
               </div>
               <div class="context-menu-scroll">
-                <div v-for="section in ['input', 'generate', 'transform', 'output']" :key="section" class="context-section">
+                <div v-for="section in ['input', 'generate', 'transform', 'annotation', 'output']" :key="section" class="context-section">
                   <div class="section-label" :style="{ '--section-color': getSectionColor(section) }">{{ section }}</div>
                   <div class="context-menu-grid">
                     <button 
@@ -415,23 +441,23 @@
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
             </div>
-            <h3>Settings</h3>
+            <h3>{{ $t('workflow.settings') }}</h3>
           </div>
           <div class="modal-body">
             <div class="byok-section">
               <div class="byok-header">
                 <span class="byok-badge">BYOK</span>
-                <h4>Bring Your Own Key</h4>
+                <h4>{{ $t('workflow.bringYourOwnKey') }}</h4>
               </div>
-              <p class="byok-desc">Use your own deAPI key to access AI models. Get your key at <a href="https://deapi.ai" target="_blank" rel="noopener">deapi.ai</a></p>
+              <p class="byok-desc">{{ $t('workflow.byokDesc') }}</p>
               
               <div class="form-field">
-                <label>deAPI Key</label>
+                <label>{{ $t('workflow.deapiKey') }}</label>
                 <div class="api-key-input">
                   <input
                     v-model="customApiKey"
                     :type="showApiKey ? 'text' : 'password'"
-                    placeholder="sk-..."
+                    :placeholder="$t('workflow.enterApiKey')"
                     @keyup.enter="saveApiKey"
                   />
                   <button class="toggle-visibility" @click="showApiKey = !showApiKey" type="button">
@@ -458,16 +484,55 @@
                 </svg>
                 <span>{{ apiKeyStatus.message }}</span>
               </div>
+              
+              <div class="byok-divider"></div>
+
+              <p class="byok-desc">{{ $t('workflow.iflowDesc') }} <a href="https://iflow.cn" target="_blank" rel="noopener">iflow.cn</a></p>
+
+              <div class="form-field">
+                <label>{{ $t('workflow.iflowKey') }}</label>
+                <div class="api-key-input">
+                  <input
+                    v-model="customiFlowKey"
+                    :type="showiFlowKey ? 'text' : 'password'"
+                    :placeholder="$t('workflow.enterIflowKey')"
+                    @keyup.enter="saveiFlowKey"
+                  />
+                  <button class="toggle-visibility" @click="showiFlowKey = !showiFlowKey" type="button">
+                    <svg v-if="showiFlowKey" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div v-if="iFlowKeyStatus" class="api-key-status" :class="iFlowKeyStatus.type">
+                <svg v-if="iFlowKeyStatus.type === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span>{{ iFlowKeyStatus.message }}</span>
+              </div>
             </div>
           </div>
           <div class="modal-footer">
-            <button class="modal-btn secondary" @click="clearApiKey" :disabled="!hasCustomApiKey">Clear Key</button>
-            <button class="modal-btn secondary" @click="showSettingsModal = false">Close</button>
+            <button class="modal-btn secondary" @click="clearApiKey" :disabled="!hasCustomApiKey">{{ $t('workflow.clearKey') }} (deAPI)</button>
+            <button class="modal-btn secondary" @click="cleariFlowKey" :disabled="!hasCustomiFlowKey">{{ $t('workflow.clearKey') }} (iFlow)</button>
+            <button class="modal-btn secondary" @click="showSettingsModal = false">{{ $t('workflow.cancel') }}</button>
             <button class="modal-btn primary" @click="saveApiKey" :disabled="!customApiKey.trim()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
-              Save Key
+              {{ $t('workflow.saveKey') }}
             </button>
           </div>
         </div>
@@ -496,6 +561,10 @@ import ImageAnalysisNode from './nodes/ImageAnalysisNode.vue'
 import ImageBackgroundRemovalNode from './nodes/ImageBackgroundRemovalNode.vue'
 import VideoToTextNode from './nodes/VideoToTextNode.vue'
 import ImageEnhanceNode from './nodes/ImageEnhanceNode.vue'
+import AIAssistantNode from './nodes/AIAssistantNode.vue'
+import ImagePromptEnhancerNode from './nodes/ImagePromptEnhancerNode.vue'
+import VideoPromptEnhancerNode from './nodes/VideoPromptEnhancerNode.vue'
+import StickyNoteNode from './nodes/StickyNoteNode.vue'
 import OutputNode from './nodes/OutputNode.vue'
 
 import api from '../services/api.js'
@@ -515,6 +584,10 @@ const nodeTypesMap = {
   bgRemoval: markRaw(ImageBackgroundRemovalNode),
   videoToText: markRaw(VideoToTextNode),
   imageEnhance: markRaw(ImageEnhanceNode),
+  aiAssistant: markRaw(AIAssistantNode),
+  imagePromptEnhancer: markRaw(ImagePromptEnhancerNode),
+  videoPromptEnhancer: markRaw(VideoPromptEnhancerNode),
+  stickyNote: markRaw(StickyNoteNode),
   output: markRaw(OutputNode)
 }
 
@@ -531,6 +604,10 @@ const nodeDefinitions = computed(() => ({
   bgRemoval: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', label: t('workflow.bgRemoval'), desc: 'Remove image background', color: '#EC4899', section: 'transform', sectionColor: '#0EA5E9' },
   videoToText: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M7 21h10"/><path d="M12 17v4"/><path d="M9 8h6"/><path d="M9 12h6"/></svg>', label: t('workflow.videoToText'), desc: 'Transcribe videos', color: '#22C55E', section: 'transform', sectionColor: '#0EA5E9' },
   imageEnhance: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.912 5.886h6.19l-5.007 3.638L17.007 18.41 12 14.772l-5.007 3.638 1.912-5.886-5.007-3.638h6.19z"/><path d="M5 3 2 6l3 3"/><path d="m19 3 3 3-3 3"/></svg>', label: t('workflow.imageEnhance'), desc: 'Enhance image quality', color: '#FBBF24', section: 'transform', sectionColor: '#0EA5E9' },
+  aiAssistant: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>', label: t('workflow.aiAssistant'), desc: 'AI Assistant for text processing', color: '#6366F1', section: 'transform', sectionColor: '#0EA5E9' },
+  imagePromptEnhancer: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.912 5.886h6.19l-5.007 3.638L17.007 18.41 12 14.772l-5.007 3.638 1.912-5.886-5.007-3.638h6.19z"/><path d="M5 3 2 6l3 3"/><path d="m19 3 3 3-3 3"/></svg>', label: t('workflow.imagePromptEnhancer'), desc: 'Enhance prompts for image generation', color: '#A855F7', section: 'transform', sectionColor: '#0EA5E9' },
+  videoPromptEnhancer: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" x2="22" y1="10" y2="10"/><line x1="2" x2="2" y1="7" y2="13"/><line x1="22" x2="22" y1="7" y2="13"/><path d="m9 21 3-3 3 3"/></svg>', label: t('workflow.videoPromptEnhancer'), desc: 'Enhance prompts for video generation', color: '#EC4899', section: 'transform', sectionColor: '#0EA5E9' },
+  stickyNote: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>', label: t('workflow.stickyNote'), desc: 'Add text notes to canvas', color: '#FBBF24', section: 'annotation', sectionColor: '#F59E0B' },
   output: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>', label: t('workflow.output'), desc: 'Final output node', color: '#F59E0B', section: 'output', sectionColor: '#F59E0B' }
 }))
 
@@ -604,6 +681,193 @@ const redo = () => {
 // Initialize history with empty state
 saveHistory()
 
+// Parameter change detection for workflow nodes
+// This tracks executed parameters and clears stale results when parameters change
+
+// Get relevant parameters for each node type that affect the output
+const getNodeParams = (nodeType, data) => {
+  const params = {}
+  
+  // Common parameters that affect output
+  switch (nodeType) {
+    case 'imageGen':
+      return {
+        model: data.model,
+        width: data.width,
+        height: data.height,
+        steps: data.steps,
+        guidance: data.guidance,
+        seed: data.seed,
+        batchSize: data.batchSize
+      }
+    case 'videoGen':
+      return {
+        model: data.model,
+        width: data.width,
+        height: data.height,
+        frames: data.frames,
+        fps: data.fps,
+        steps: data.steps,
+        guidance: data.guidance,
+        seed: data.seed
+      }
+    case 'img2video':
+      return {
+        model: data.model,
+        frames: data.frames,
+        fps: data.fps,
+        prompt: data.prompt,
+        seed: data.seed
+      }
+    case 'imageEdit':
+      return {
+        model: data.model,
+        editPrompt: data.editPrompt,
+        steps: data.steps,
+        guidance: data.guidance,
+        seed: data.seed
+      }
+    case 'tts':
+      return {
+        model: data.model,
+        voice: data.voice,
+        lang: data.lang,
+        speed: data.speed
+      }
+    case 'imageAnalysis':
+      return {
+        model: data.model,
+        language: data.language
+      }
+    case 'bgRemoval':
+      return {
+        model: data.model
+      }
+    case 'imageEnhance':
+      return {
+        model: data.model,
+        enhanceType: data.enhanceType,
+        enhancePrompt: data.enhancePrompt,
+        strength: data.strength,
+        width: data.width,
+        height: data.height
+      }
+    case 'videoToText':
+      return {
+        model: data.model,
+        videoUrl: data.videoUrl,
+        includeTs: data.includeTs
+      }
+    case 'aiAssistant':
+      return {
+        systemPrompt: data.systemPrompt,
+        model: data.model
+      }
+    case 'imagePromptEnhancer':
+    case 'videoPromptEnhancer':
+      return {
+        style: data.style
+      }
+    case 'textInput':
+      return {
+        text: data.text
+      }
+    case 'imageInput':
+      return {
+        imageData: data.imageData ? data.imageData.substring(0, 100) : null // Just use prefix for comparison
+      }
+    default:
+      return {}
+  }
+}
+
+// Simple hash function for parameters
+const hashParams = (params) => {
+  return JSON.stringify(params)
+}
+
+// Store for tracking last executed parameters per node
+const lastExecutedParams = ref({})
+
+// Check if node parameters have changed since last execution
+const haveParamsChanged = (nodeId, nodeType, data) => {
+  const currentParams = getNodeParams(nodeType, data)
+  const currentHash = hashParams(currentParams)
+  const lastHash = lastExecutedParams.value[nodeId]
+  
+  return lastHash !== undefined && lastHash !== currentHash
+}
+
+// Clear stale results from a node and its downstream nodes
+const clearStaleResults = (nodeId) => {
+  const nodeIdx = nodes.value.findIndex(n => n.id === nodeId)
+  if (nodeIdx === -1) return
+  
+  const node = nodes.value[nodeIdx]
+  
+  // Clear the node's result
+  if (node.data.resultUrl || node.data.status === 'completed') {
+    node.data.resultUrl = null
+    node.data.resultUrls = null
+    node.data.status = 'idle'
+    delete node.data.cached
+  }
+  
+  // Find and clear downstream nodes (nodes connected from this node)
+  const downstreamNodeIds = new Set()
+  const findDownstream = (nId) => {
+    edges.value.forEach(edge => {
+      if (edge.source === nId && !downstreamNodeIds.has(edge.target)) {
+        downstreamNodeIds.add(edge.target)
+        findDownstream(edge.target)
+      }
+    })
+  }
+  findDownstream(nodeId)
+  
+  // Clear results from downstream nodes
+  downstreamNodeIds.forEach(dNodeId => {
+    const dIdx = nodes.value.findIndex(n => n.id === dNodeId)
+    if (dIdx !== -1) {
+      const dNode = nodes.value[dIdx]
+      if (dNode.data.resultUrl || dNode.data.status === 'completed') {
+        dNode.data.resultUrl = null
+        dNode.data.resultUrls = null
+        dNode.data.status = 'idle'
+        dNode.data.text = null
+        delete dNode.data.cached
+      }
+      // Also clear the last executed params for downstream nodes
+      delete lastExecutedParams.value[dNodeId]
+    }
+  })
+}
+
+// Watch for node data changes and clear stale results
+watch(
+  () => nodes.value.map(n => ({ id: n.id, type: n.type, data: n.data })),
+  (newNodes, oldNodes) => {
+    if (!oldNodes || isExecuting.value) return
+    
+    newNodes.forEach((newNode, idx) => {
+      const oldNode = oldNodes[idx]
+      if (!oldNode || newNode.id !== oldNode.id) return
+      
+      // Check if this node has been executed before
+      if (lastExecutedParams.value[newNode.id]) {
+        const paramsChanged = haveParamsChanged(newNode.id, newNode.type, newNode.data)
+        
+        if (paramsChanged) {
+          console.log(`[Workflow] Parameters changed for node ${newNode.id}, clearing stale results`)
+          clearStaleResults(newNode.id)
+          delete lastExecutedParams.value[newNode.id]
+        }
+      }
+    })
+  },
+  { deep: true }
+)
+
 // Settings modal (BYOK)
 const showSettingsModal = ref(false)
 const customApiKey = ref('')
@@ -619,13 +883,21 @@ const loadSavedApiKey = () => {
   }
 }
 
-// Save API key
+// Save API keys (both deAPI and iFlow)
 const saveApiKey = () => {
   if (customApiKey.value.trim()) {
     localStorage.setItem('deapi_key', customApiKey.value.trim())
-    apiKeyStatus.value = { type: 'success', message: 'API key saved successfully!' }
+    apiKeyStatus.value = { type: 'success', message: t('workflow.keySaved') }
     setTimeout(() => {
       apiKeyStatus.value = null
+    }, 2000)
+  }
+
+  if (customiFlowKey.value.trim()) {
+    localStorage.setItem('iflow_key', customiFlowKey.value.trim())
+    iFlowKeyStatus.value = { type: 'success', message: t('workflow.keySaved') }
+    setTimeout(() => {
+      iFlowKeyStatus.value = null
     }, 2000)
   }
 }
@@ -634,9 +906,44 @@ const saveApiKey = () => {
 const clearApiKey = () => {
   localStorage.removeItem('deapi_key')
   customApiKey.value = ''
-  apiKeyStatus.value = { type: 'success', message: 'API key cleared' }
+  apiKeyStatus.value = { type: 'success', message: t('workflow.keyCleared') }
   setTimeout(() => {
     apiKeyStatus.value = null
+  }, 2000)
+}
+
+// iFlow API Key (for AI Assistant)
+const customiFlowKey = ref('')
+const showiFlowKey = ref(false)
+const iFlowKeyStatus = ref(null)
+const hasCustomiFlowKey = computed(() => !!localStorage.getItem('iflow_key'))
+
+// Load saved iFlow key on mount
+const loadSavediFlowKey = () => {
+  const savedKey = localStorage.getItem('iflow_key')
+  if (savedKey) {
+    customiFlowKey.value = savedKey
+  }
+}
+
+// Save iFlow key
+const saveiFlowKey = () => {
+  if (customiFlowKey.value.trim()) {
+    localStorage.setItem('iflow_key', customiFlowKey.value.trim())
+    iFlowKeyStatus.value = { type: 'success', message: t('workflow.keySaved') }
+    setTimeout(() => {
+      iFlowKeyStatus.value = null
+    }, 2000)
+  }
+}
+
+// Clear iFlow key
+const cleariFlowKey = () => {
+  localStorage.removeItem('iflow_key')
+  customiFlowKey.value = ''
+  iFlowKeyStatus.value = { type: 'success', message: t('workflow.keyCleared') }
+  setTimeout(() => {
+    iFlowKeyStatus.value = null
   }, 2000)
 }
 
@@ -918,7 +1225,8 @@ const getSectionColor = (section) => {
     input: '#6366F1',
     generate: '#EC4899',
     transform: '#0EA5E9',
-    output: '#F59E0B'
+    annotation: '#F59E0B',
+    output: '#10B981'
   }
   return colors[section] || '#6366F1'
 }
@@ -944,6 +1252,10 @@ const getDefaultData = (type) => {
     bgRemoval: { model: 'Ben2' },
     videoToText: { model: 'WhisperLargeV3', includeTs: true, videoUrl: '' },
     imageEnhance: { model: 'Flux_2_Klein_4B_BF16', aspectRatio: 'original', width: 768, height: 768, enhanceType: 'quality', enhancePrompt: 'enhance image quality, improve details, sharp focus, high resolution', strength: 0.5 },
+    aiAssistant: { systemPrompt: 'You are a helpful AI assistant.', userPrompt: '', model: 'gpt-4o-mini', response: '' },
+    imagePromptEnhancer: { originalPrompt: '', enhancedPrompt: '' },
+    videoPromptEnhancer: { originalPrompt: '', enhancedPrompt: '' },
+    stickyNote: { text: '', color: 'yellow' },
     output: {}
   }
   return { ...defaults[type] }
@@ -955,6 +1267,117 @@ const clearCanvas = () => {
   nodeIdCounter = 0
   executionStatus.value = null
   saveHistory()
+}
+
+// Export/Import functionality
+const importFileInput = ref(null)
+
+const exportWorkflow = () => {
+  if (nodes.value.length === 0) return
+  
+  const workflowData = {
+    version: '1.0',
+    exportedAt: new Date().toISOString(),
+    nodes: nodes.value,
+    edges: edges.value
+  }
+  
+  const blob = new Blob([JSON.stringify(workflowData, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `videlo-workflow-${Date.now()}.json`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  
+  executionStatus.value = {
+    type: 'success',
+    message: t('workflow.exportSuccess')
+  }
+  setTimeout(() => {
+    executionStatus.value = null
+  }, 2000)
+}
+
+const triggerImport = () => {
+  importFileInput.value?.click()
+}
+
+const handleImport = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  
+  if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+    executionStatus.value = {
+      type: 'error',
+      message: t('workflow.importErrorInvalidFile')
+    }
+    setTimeout(() => {
+      executionStatus.value = null
+    }, 3000)
+    return
+  }
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const workflowData = JSON.parse(e.target.result)
+      
+      // Validate workflow data
+      if (!workflowData.nodes || !Array.isArray(workflowData.nodes)) {
+        throw new Error('Invalid workflow: missing nodes')
+      }
+      if (!workflowData.edges || !Array.isArray(workflowData.edges)) {
+        throw new Error('Invalid workflow: missing edges')
+      }
+      
+      // Clear current canvas and load imported workflow
+      nodes.value = workflowData.nodes
+      edges.value = workflowData.edges
+      
+      // Update node counter to be higher than any existing node
+      const maxCounter = workflowData.nodes.reduce((max, node) => {
+        const match = node.id?.match(/_(\d+)$/)
+        const num = match ? parseInt(match[1]) : 0
+        return Math.max(max, num)
+      }, 0)
+      nodeIdCounter = maxCounter
+      
+      saveHistory()
+      
+      executionStatus.value = {
+        type: 'success',
+        message: t('workflow.importSuccess')
+      }
+      setTimeout(() => {
+        executionStatus.value = null
+      }, 2000)
+      
+    } catch (err) {
+      executionStatus.value = {
+        type: 'error',
+        message: t('workflow.importErrorParse') + ': ' + err.message
+      }
+      setTimeout(() => {
+        executionStatus.value = null
+      }, 3000)
+    }
+  }
+  reader.onerror = () => {
+    executionStatus.value = {
+      type: 'error',
+      message: t('workflow.importErrorRead')
+    }
+    setTimeout(() => {
+      executionStatus.value = null
+    }, 3000)
+  }
+  reader.readAsText(file)
+  
+  // Reset input so same file can be selected again
+  event.target.value = ''
 }
 
 // Quick action: Add connected node
@@ -1133,6 +1556,13 @@ const pollExecution = async (executionId) => {
           if (idx !== -1) {
             nodes.value[idx].data = { ...nodes.value[idx].data, ...result }
             
+            // Store the executed parameters hash for this node
+            if (result.status === 'completed' || result.resultUrl) {
+              const node = nodes.value[idx]
+              const params = getNodeParams(node.type, node.data)
+              lastExecutedParams.value[nodeId] = hashParams(params)
+            }
+            
             // Handle multiple images - auto-create output nodes
             if (result.resultUrls && result.resultUrls.length > 1) {
               const sourceNode = nodes.value[idx]
@@ -1225,6 +1655,7 @@ const handleKeydown = (e) => {
 onMounted(() => {
   loadSavedWorkflows()
   loadSavedApiKey()
+  loadSavediFlowKey()
   window.addEventListener('keydown', handleKeydown)
 })
 

@@ -44,7 +44,7 @@ def _run_migrations():
     # Get list of existing tables
     existing_tables = inspector.get_table_names()
     
-    # Migration: Add user_id and credits_charged to generations table
+    # Migration: Add user_id and credits_charged to generations table (run once)
     if 'generations' in existing_tables:
         columns = [col['name'] for col in inspector.get_columns('generations')]
         
@@ -52,14 +52,12 @@ def _run_migrations():
             if 'user_id' not in columns:
                 conn.execute(text('ALTER TABLE generations ADD COLUMN user_id INTEGER'))
                 conn.commit()
-                print("Migration: Added user_id column to generations table")
             
             if 'credits_charged' not in columns:
                 conn.execute(text('ALTER TABLE generations ADD COLUMN credits_charged INTEGER'))
                 conn.commit()
-                print("Migration: Added credits_charged column to generations table")
     
-    # Migration: Create users table if it doesn't exist
+    # Migration: Create users table if it doesn't exist (run once)
     if 'users' not in existing_tables:
         with engine.connect() as conn:
             conn.execute(text('''
@@ -74,7 +72,6 @@ def _run_migrations():
                 )
             '''))
             conn.commit()
-            print("Migration: Created users table")
             
             # Create default demo user
             conn.execute(text('''
@@ -82,9 +79,8 @@ def _run_migrations():
                 VALUES (1, 'demo@videlo.ai', 100, 100)
             '''))
             conn.commit()
-            print("Migration: Created demo user with 100 credits")
     
-    # Migration: Create credit_transactions table if it doesn't exist
+    # Migration: Create credit_transactions table if it doesn't exist (run once)
     if 'credit_transactions' not in existing_tables:
         with engine.connect() as conn:
             conn.execute(text('''
@@ -102,9 +98,8 @@ def _run_migrations():
                 )
             '''))
             conn.commit()
-            print("Migration: Created credit_transactions table")
     
-    # Migration: Create credit_packages table if it doesn't exist
+    # Migration: Create credit_packages table if it doesn't exist (run once)
     if 'credit_packages' not in existing_tables:
         with engine.connect() as conn:
             conn.execute(text('''
@@ -119,4 +114,129 @@ def _run_migrations():
                 )
             '''))
             conn.commit()
-            print("Migration: Created credit_packages table")
+    
+    # Migration: Create ad-related tables if they don't exist
+    # NOTE: We use CREATE TABLE IF NOT EXISTS to preserve existing data
+    with engine.connect() as conn:
+        # ad_campaigns - multi-phase schema
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ad_campaigns (
+                id INTEGER PRIMARY KEY,
+                user_prompt TEXT NOT NULL,
+                current_phase INTEGER DEFAULT 1,
+                phase_status VARCHAR(50) DEFAULT 'pending',
+                clarification_questions JSON,
+                user_answers JSON,
+                context JSON,
+                ad_angles JSON,
+                num_scripts INTEGER DEFAULT 5,
+                num_avatars INTEGER DEFAULT 3,
+                scripts_status VARCHAR(50) DEFAULT 'pending',
+                avatars_status VARCHAR(50) DEFAULT 'pending',
+                storyboards_status VARCHAR(50) DEFAULT 'pending',
+                image_prompts_status VARCHAR(50) DEFAULT 'pending',
+                video_prompts_status VARCHAR(50) DEFAULT 'pending',
+                iteration_count INTEGER DEFAULT 0,
+                last_iteration_command TEXT,
+                overall_status VARCHAR(50) DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP
+            )
+        '''))
+        conn.commit()
+        
+        # ad_avatars
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ad_avatars (
+                id INTEGER PRIMARY KEY,
+                campaign_id INTEGER NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                age INTEGER,
+                gender VARCHAR(20),
+                region VARCHAR(50),
+                appearance TEXT,
+                outfit_style TEXT,
+                personality_vibe TEXT,
+                appearance_locked BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES ad_campaigns(id)
+            )
+        '''))
+        conn.commit()
+        
+        # ad_scripts
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ad_scripts (
+                id INTEGER PRIMARY KEY,
+                campaign_id INTEGER NOT NULL,
+                script_id INTEGER NOT NULL,
+                hook TEXT NOT NULL,
+                cta TEXT,
+                framework VARCHAR(50),
+                scenes JSON NOT NULL,
+                avatar_id INTEGER,
+                ad_angle_ref INTEGER,
+                version INTEGER DEFAULT 1,
+                iteration_notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES ad_campaigns(id),
+                FOREIGN KEY (avatar_id) REFERENCES ad_avatars(id)
+            )
+        '''))
+        conn.commit()
+        
+        # ad_storyboards
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ad_storyboards (
+                id INTEGER PRIMARY KEY,
+                campaign_id INTEGER NOT NULL,
+                script_id INTEGER NOT NULL,
+                scenes JSON NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES ad_campaigns(id),
+                FOREIGN KEY (script_id) REFERENCES ad_scripts(id)
+            )
+        '''))
+        conn.commit()
+        
+        # ad_scene_prompts
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ad_scene_prompts (
+                id INTEGER PRIMARY KEY,
+                storyboard_id INTEGER NOT NULL,
+                scene_num INTEGER NOT NULL,
+                image_prompt TEXT,
+                image_generation_id INTEGER,
+                image_url VARCHAR,
+                image_status VARCHAR(50) DEFAULT 'pending',
+                video_prompt TEXT,
+                video_generation_id INTEGER,
+                video_url VARCHAR,
+                video_status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (storyboard_id) REFERENCES ad_storyboards(id),
+                FOREIGN KEY (image_generation_id) REFERENCES generations(id),
+                FOREIGN KEY (video_generation_id) REFERENCES generations(id)
+            )
+        '''))
+        conn.commit()
+        
+        # ad_conversations
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ad_conversations (
+                id INTEGER PRIMARY KEY,
+                campaign_id INTEGER NOT NULL,
+                role VARCHAR(20) NOT NULL,
+                phase INTEGER,
+                content TEXT NOT NULL,
+                message_type VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES ad_campaigns(id)
+            )
+        '''))
+        conn.commit()

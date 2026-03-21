@@ -70,15 +70,15 @@ Videlo/
 ├── backend/
 │   ├── app/
 │   │   ├── routes/
-│   │   │   ├── generations.py    # Generation endpoints (text2img, txt2video, img2video, img2img)
-│   │   │   ├── prompts.py        # Prompt enhancement
-│   │   │   ├── ads.py            # AI Ads Generator pipeline
-│   │   │   ├── workflow.py       # Workflow canvas execution
-│   │   │   └── credits.py        # Credit system
-│   │   ├── services/
-│   │   │   ├── deapi.py          # deAPI client
-│   │   │   ├── ads_pipeline.py   # Ads generation pipeline
-│   │   │   └── credit_system.py  # Credit tracking
+│ │ │ ├── generations.py # Generation endpoints (text2img, txt2video, img2video, img2img)
+│ │ │ ├── prompts.py # Prompt enhancement
+│ │ │ ├── ads.py # AI Ads Generator pipeline
+│ │ │ └── workflow.py # Workflow canvas execution
+│ │ ├── services/
+│ │ │ ├── deapi.py # deAPI client
+│ │ │ ├── iflow.py # iFlow API client
+│ │ │ ├── nanobanana.py # Nanobanana API client
+│ │ │ └── ads_pipeline.py # Ads generation pipeline
 │   │   ├── utils/
 │   │   │   └── security.py       # Security utilities
 │   │   ├── config.py             # App configuration
@@ -108,13 +108,20 @@ Videlo/
 │   │   │       ├── ImageToVideoNode.vue
 │   │   │       ├── VideoGenNode.vue
 │   │   │       ├── VideoToTextNode.vue
-│   │   │       ├── TextToSpeechNode.vue
-│   │   │       └── OutputNode.vue
-│   │   ├── views/
-│   │   │   ├── Home.vue          # Main generation view
-│   │   │   ├── ImageEdit.vue     # Image editing page
-│   │   │   ├── AdGenerator.vue   # AI Ads Generator
-│   │   │   └── Workflow.vue      # Workflow canvas page
+│ │ │ ├── TextToSpeechNode.vue
+│ │ │ ├── StickyNoteNode.vue
+│ │ │ ├── AIAssistantNode.vue
+│ │ │ ├── ImagePromptEnhancerNode.vue
+│ │ │ ├── VideoPromptEnhancerNode.vue
+│ │ │ └── OutputNode.vue
+│ │ ├── views/
+│ │ │ ├── Home.vue # Main generation view
+│ │ │ ├── ImageEdit.vue # Image editing page
+│ │ │ ├── AdGenerator.vue # AI Ads Generator
+│ │ │ ├── AdsImgGen.vue # Ads Image Generator
+│ │ │ ├── ImgGen.vue # Image Generator
+│ │ │ ├── PromptsGallery.vue # Prompts gallery view
+│ │ │ └── Workflow.vue # Workflow canvas page
 │   │   ├── services/
 │   │   │   └── api.js            # API client
 │   │   ├── i18n/                 # Internationalization
@@ -240,6 +247,9 @@ Interactive API documentation: `http://localhost:8000/docs`
 | `/txt2video` | Text to Video generation |
 | `/img2video` | Image to Video generation |
 | `/ads` | AI Ads Generator |
+| `/ads-img-gen` | Ads Image Generator |
+| `/img-gen` | Image Generator |
+| `/prompts-gallery` | Browse prompts gallery |
 | `/workflow` | Visual workflow canvas with node-based editor |
 | `/gallery` | Browse all generations |
 
@@ -251,7 +261,7 @@ The Workflow Canvas is a visual node-based editor for creating complex AI pipeli
 
 ### Features
 - **Infinite Canvas** - Pan and zoom freely like Excalidraw
-- **12 Node Types** - Mix and match to create custom workflows with SVG icons
+- **16 Node Types** - Mix and match to create custom workflows with SVG icons
 - **Drag & Connect** - Visual connections between nodes
 - **Undo/Redo** - Full history support with Ctrl+Z / Ctrl+Y
 - **Cut Connections** - Click the ✕ button on selected node connections to delete them
@@ -288,6 +298,10 @@ The Workflow Canvas is a visual node-based editor for creating complex AI pipeli
 | **Video Gen** | Text | Video | Generate videos from text |
 | **Video to Text** | Video | Text | Extract text/transcribe video |
 | **Text to Speech** | Text | Audio | Convert text to audio |
+| **Sticky Note** | - | - | Add notes and annotations |
+| **AI Assistant** | Text | Text | AI-powered text assistance |
+| **Image Prompt Enhancer** | Text | Text | Enhance image prompts with AI |
+| **Video Prompt Enhancer** | Text | Text | Enhance video prompts with AI |
 | **Output** | Any | - | Final output display |
 
 ---

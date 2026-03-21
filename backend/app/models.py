@@ -4,53 +4,6 @@ from sqlalchemy.orm import relationship
 from .database import Base
 
 
-class User(Base):
-    """User model with credit balance tracking."""
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    credits_balance = Column(Integer, default=0)
-    total_credits_purchased = Column(Integer, default=0)
-    total_credits_used = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    credit_transactions = relationship("CreditTransaction", back_populates="user")
-    generations = relationship("Generation", back_populates="user")
-
-
-class CreditTransaction(Base):
-    """Model for tracking all credit transactions."""
-    __tablename__ = "credit_transactions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    amount = Column(Integer, nullable=False)  # positive for purchases/bonus, negative for usage
-    balance_after = Column(Integer, nullable=False)
-    transaction_type = Column(String(50), nullable=False)  # 'purchase', 'generation', 'refund', 'bonus', 'signup'
-    description = Column(Text, nullable=True)
-    generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)  # Link to generation if applicable
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    user = relationship("User", back_populates="credit_transactions")
-
-
-class CreditPackage(Base):
-    """Model for credit purchase packages."""
-    __tablename__ = "credit_packages"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    credits = Column(Integer, nullable=False)
-    price_cents = Column(Integer, nullable=False)
-    bonus_percent = Column(Integer, default=0)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
 class Generation(Base):
     """Model for image/video/audio generation results."""
     __tablename__ = "generations"
@@ -85,9 +38,6 @@ class Generation(Base):
     
     # LoRA support (stored as JSON array)
     loras = Column(JSON, nullable=True)
-    
-    # Credit tracking
-    credits_charged = Column(Integer, nullable=True)  # Credits deducted for this generation
     
     status = Column(String, default="pending")  # pending, processing, completed, failed
     progress = Column(Integer, default=0)  # 0-100 progress percentage
@@ -138,48 +88,58 @@ class Transcription(Base):
 
 
 class AdCampaign(Base):
-    """Model for AI Ads Generator pipeline - tracks the full ad creation workflow."""
+    """
+    Model for AI Ads Generator - Agentic Multi-Phase Workflow.
+    
+    Supports conversational ad creation through 10 phases:
+    1. UNDERSTAND & ASK - Ask clarification questions
+    2. BUILD CONTEXT - Convert to structured JSON
+    3. GENERATE AD STRATEGY - Create ad angles
+    4. SCRIPT GENERATION - Generate UGC scripts
+    5. AVATAR GENERATION - Create UGC characters
+    6. STORYBOARD ENGINE - Break into scenes
+    7. IMAGE PROMPT GENERATION - Scene image prompts
+    8. VIDEO PROMPT GENERATION - Scene video prompts
+    9. BATCH OUTPUT - Return structured output
+    10. ITERATION MODE - Modify outputs
+    """
     __tablename__ = "ad_campaigns"
 
     id = Column(Integer, primary_key=True, index=True)
     
     # User input
     user_prompt = Column(Text, nullable=False)
-    brand_name = Column(String, nullable=True)
-    brand_description = Column(Text, nullable=True)
     
-    # Pipeline status
-    current_step = Column(String, default="init")  # init, enhancing, script, image, video, qa, completed, failed
+    # Current workflow phase
+    current_phase = Column(Integer, default=1)  # 1-10
+    phase_status = Column(String, default="pending")  # pending, processing, completed, failed
     
-    # Step 1: Prompt Enhancement
-    enhanced_prompt = Column(Text, nullable=True)
-    enhancement_status = Column(String, default="pending")  # pending, processing, completed, failed
+    # Phase 1: Clarification questions asked
+    clarification_questions = Column(JSON, nullable=True)  # List of questions asked
+    user_answers = Column(JSON, nullable=True)  # User's answers
     
-    # Step 2: Script Generation
-    script = Column(Text, nullable=True)
-    script_status = Column(String, default="pending")  # pending, processing, completed, failed
-    script_feedback = Column(Text, nullable=True)
-    script_request_id = Column(String, nullable=True)  # For tracking LLM request
+    # Phase 2: Structured context
+    context = Column(JSON, nullable=True)  # {brand, product, target_audience, platform, hooks, tone, ad_angles, avatar_preferences, constraints}
     
-    # Step 3: Image Generation
-    image_url = Column(String, nullable=True)
-    image_status = Column(String, default="pending")  # pending, processing, completed, failed
-    image_feedback = Column(Text, nullable=True)
-    image_request_id = Column(String, nullable=True)  # deAPI request_id
-    image_generation_id = Column(Integer, nullable=True)  # Link to Generation model
+    # Phase 3: Ad strategy/angles
+    ad_angles = Column(JSON, nullable=True)  # List of {hook_idea, emotional_trigger, why_convert}
     
-    # Step 4: Video Generation
-    video_url = Column(String, nullable=True)
-    video_status = Column(String, default="pending")  # pending, processing, completed, failed
-    video_feedback = Column(Text, nullable=True)
-    video_request_id = Column(String, nullable=True)  # deAPI request_id
-    video_generation_id = Column(Integer, nullable=True)  # Link to Generation model
+    # Phase 4-8: Scripts, Avatars, Storyboards, Prompts (stored in related tables)
     
-    # QA Results
-    qa_status = Column(String, default="pending")  # pending, processing, approved, rejected
-    qa_feedback = Column(Text, nullable=True)
-    qa_details = Column(Text, nullable=True)  # JSON string with detailed QA results
-    qa_iterations = Column(Integer, default=0)  # Number of QA iterations
+    # Batch settings
+    num_scripts = Column(Integer, default=5)
+    num_avatars = Column(Integer, default=3)
+    
+    # Generation status tracking
+    scripts_status = Column(String, default="pending")
+    avatars_status = Column(String, default="pending")
+    storyboards_status = Column(String, default="pending")
+    image_prompts_status = Column(String, default="pending")
+    video_prompts_status = Column(String, default="pending")
+    
+    # Iteration mode
+    iteration_count = Column(Integer, default=0)
+    last_iteration_command = Column(Text, nullable=True)
     
     # Overall status
     overall_status = Column(String, default="pending")  # pending, processing, completed, failed
@@ -187,7 +147,148 @@ class AdCampaign(Base):
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    avatars = relationship("AdAvatar", back_populates="campaign", cascade="all, delete-orphan")
+    scripts = relationship("AdScript", back_populates="campaign", cascade="all, delete-orphan")
+    storyboards = relationship("AdStoryboard", back_populates="campaign", cascade="all, delete-orphan")
+    conversations = relationship("AdConversation", back_populates="campaign", cascade="all, delete-orphan")
+
+
+class AdAvatar(Base):
+    """UGC character/avatar for ad campaigns."""
+    __tablename__ = "ad_avatars"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("ad_campaigns.id"), nullable=False)
+    
+    name = Column(String(100), nullable=False)
+    age = Column(Integer, nullable=True)
+    gender = Column(String(20), nullable=True)
+    region = Column(String(50), nullable=True)  # e.g., "India", "US", "Europe"
+    
+    # Physical appearance (locked for consistency)
+    appearance = Column(Text, nullable=True)  # Detailed physical description
+    outfit_style = Column(Text, nullable=True)
+    personality_vibe = Column(Text, nullable=True)  # e.g., "friendly, approachable, confident"
+    
+    # Consistency lock
+    appearance_locked = Column(Boolean, default=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    campaign = relationship("AdCampaign", back_populates="avatars")
+
+
+class AdScript(Base):
+    """UGC-style ad script."""
+    __tablename__ = "ad_scripts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("ad_campaigns.id"), nullable=False)
+    
+    script_id = Column(Integer, nullable=False)  # 1-N within campaign
+    
+    # Script content
+    hook = Column(Text, nullable=False)  # Opening hook
+    cta = Column(Text, nullable=True)  # Call to action
+    framework = Column(String(50), nullable=True)  # PAS, Testimonial, Before/After, Curiosity
+    
+    # Full script as JSON
+    scenes = Column(JSON, nullable=False)  # [{scene: 1, dialogue: "", visual: "", duration: ""}]
+    
+    # Assigned avatar
+    avatar_id = Column(Integer, ForeignKey("ad_avatars.id"), nullable=True)
+    
+    # Generation metadata
+    ad_angle_ref = Column(Integer, nullable=True)  # Reference to ad angle used
+    
+    # Iteration tracking
+    version = Column(Integer, default=1)
+    iteration_notes = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    campaign = relationship("AdCampaign", back_populates="scripts")
+    avatar = relationship("AdAvatar")
+    storyboard = relationship("AdStoryboard", back_populates="script", uselist=False)
+
+
+class AdStoryboard(Base):
+    """Storyboard for a script with scene breakdowns."""
+    __tablename__ = "ad_storyboards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("ad_campaigns.id"), nullable=False)
+    script_id = Column(Integer, ForeignKey("ad_scripts.id"), nullable=False)
+    
+    # Scene breakdowns
+    scenes = Column(JSON, nullable=False)  # [{scene_num, visual_direction, camera_angle, lighting, emotion, environment}]
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    campaign = relationship("AdCampaign", back_populates="storyboards")
+    script = relationship("AdScript", back_populates="storyboard")
+    scene_prompts = relationship("AdScenePrompt", back_populates="storyboard", cascade="all, delete-orphan")
+
+
+class AdScenePrompt(Base):
+    """Image and video prompts for each scene."""
+    __tablename__ = "ad_scene_prompts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    storyboard_id = Column(Integer, ForeignKey("ad_storyboards.id"), nullable=False)
+    
+    scene_num = Column(Integer, nullable=False)
+    
+    # Image prompt (Phase 7)
+    image_prompt = Column(Text, nullable=True)
+    image_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    image_url = Column(String, nullable=True)
+    image_status = Column(String, default="pending")
+    
+    # Video prompt (Phase 8)
+    video_prompt = Column(Text, nullable=True)
+    video_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    video_url = Column(String, nullable=True)
+    video_status = Column(String, default="pending")
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    storyboard = relationship("AdStoryboard", back_populates="scene_prompts")
+
+
+class AdConversation(Base):
+    """Track the conversational flow for the ad campaign."""
+    __tablename__ = "ad_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("ad_campaigns.id"), nullable=False)
+    
+    role = Column(String(20), nullable=False)  # "user" or "assistant"
+    phase = Column(Integer, nullable=True)  # Which phase this message belongs to
+    content = Column(Text, nullable=False)
+    
+    # Metadata
+    message_type = Column(String(50), nullable=True)  # "question", "answer", "iteration", "result"
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    campaign = relationship("AdCampaign", back_populates="conversations")
 
 
 class Workflow(Base):

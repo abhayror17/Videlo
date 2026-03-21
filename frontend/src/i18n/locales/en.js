@@ -9,8 +9,11 @@ export default {
     ads: 'AI Ads Generator',
     library: 'Library',
     gallery: 'Gallery',
+    prompts: 'Prompts Gallery',
     workflow: 'Workflow Builder',
-    credits: 'Credits'
+    credits: 'Credits',
+    imgGen: 'Image Generator',
+    adsImgGen: 'Ads Image Generator'
   },
   
   // Header
@@ -46,9 +49,18 @@ export default {
     enterApiKey: 'Enter your deAPI API key',
     customKeyActive: 'Custom API key is active',
     clearKey: 'Clear Key',
-    saveKey: 'Save Key'
+    saveKey: 'Save Key',
+    iflowKey: 'iFlow Key',
+    enterIflowKey: 'Enter your iFlow key (if-...)',
+    customIflowKeyActive: 'Custom iFlow key is active',
+    // TTS Settings
+    language: 'Language',
+    voice: 'Voice',
+    speed: 'Speed',
+    voiceDesign: 'Voice Design',
+    voiceDesignPlaceholder: 'Describe the voice you want (e.g., warm, professional female voice with British accent)'
   },
-  
+
   // Home / Generation
   home: {
     clickToUpload: 'Click to upload an image',
@@ -109,7 +121,54 @@ export default {
     processing: 'Processing...',
     previousCampaigns: 'Previous Campaigns',
     noBrand: 'No Brand',
-    failedToStartCampaign: 'Failed to start campaign. Please try again.'
+    failedToStartCampaign: 'Failed to start campaign. Please try again.',
+    needsRevision: 'Needs Revision',
+    qaRejected: 'QA Review: Rejected',
+    qaFeedback: 'QA Feedback',
+    redoScript: 'Redo Script',
+    redoImage: 'Redo Image',
+    redoVideo: 'Redo Video',
+    redoing: 'Redoing...',
+    revisionHint: 'Select a step to regenerate',
+    approved: 'Approved',
+    // Multi-phase workflow
+    phaseAsk: 'Ask',
+    phaseContext: 'Context',
+    phaseStrategy: 'Strategy',
+    phaseScripts: 'Scripts',
+    phaseAvatars: 'Avatars',
+    phaseStoryboard: 'Storyboard',
+    phaseImages: 'Images',
+    phaseVideos: 'Videos',
+    phaseComplete: 'Complete',
+    helpUsUnderstand: 'Help us understand your vision',
+    typeAnswer: 'Type your answer...',
+    selectOption: 'Select an option...',
+    continue: 'Continue',
+    adStrategy: 'Ad Strategy',
+    generateScripts: 'Generate Scripts',
+    generatedScripts: 'Generated Scripts',
+    generatedAvatars: 'UGC Characters',
+    hook: 'Hook',
+    scene: 'Scene',
+    cta: 'Call to Action',
+    continueGeneration: 'Continue Generation',
+    viewResults: 'View Results',
+    tryAgain: 'Try Again',
+    processingQuestions: 'Analyzing your brief...',
+    processingContext: 'Building campaign context...',
+    processingStrategy: 'Creating ad strategy...',
+    processingScripts: 'Generating scripts...',
+    processingAvatars: 'Creating UGC characters...',
+    processingStoryboard: 'Building storyboards...',
+    processingImages: 'Generating image prompts...',
+    processingVideos: 'Generating video prompts...',
+    processingComplete: 'Finalizing campaign...',
+    confirmRedoPhase: 'Redo from this phase? This will clear all data from this phase onwards.',
+    redoingPhase: 'Redoing phase...',
+    debugLogs: 'Debug Logs',
+    noLogsYet: 'No logs yet',
+    promptTooShort: 'Please enter at least 5 characters for your ad concept'
   },
   
   // Gallery
@@ -175,6 +234,10 @@ export default {
     bgRemoval: 'Background Removal',
     videoToText: 'Video to Text',
     imageEnhance: 'Image Enhance',
+    aiAssistant: 'AI Assistant',
+    imagePromptEnhancer: 'Image Prompt Enhancer',
+    videoPromptEnhancer: 'Video Prompt Enhancer',
+    stickyNote: 'Sticky Note',
     output: 'Output',
     enterPrompt: 'Enter your prompt...',
     describeEdit: 'Describe the edit...',
@@ -192,9 +255,33 @@ export default {
     language: 'Language',
     outputFormat: 'Output Format',
     extractedText: 'Extracted Text',
+    // AI Assistant
+    systemPrompt: 'System Prompt',
+    systemPromptPlaceholder: 'Enter system instructions...',
+    userPrompt: 'User Prompt',
+    userPromptPlaceholder: 'Enter your message...',
+    aiResponse: 'AI Response',
+    // Prompt Enhancers
+    originalPrompt: 'Original Prompt',
+    enterPromptToEnhance: 'Enter prompt to enhance...',
+    enterVideoPromptToEnhance: 'Enter video prompt to enhance...',
+    enhancedPrompt: 'Enhanced Prompt',
+    copy: 'Copy',
+    copied: 'Copied!',
+    // Sticky Note
+    stickyNotePlaceholder: 'Type your note here...',
+    doubleClickToEdit: 'Double-click to edit',
+    pressEnterToSave: 'Press Enter to save',
+    // Export/Import
+    export: 'Export',
+    import: 'Import',
+    exportSuccess: 'Workflow exported successfully!',
+    importSuccess: 'Workflow imported successfully!',
+    importErrorInvalidFile: 'Please select a valid JSON file',
+    importErrorParse: 'Failed to parse workflow file',
+    importErrorRead: 'Failed to read file',
     deleteNode: 'Delete Node',
     duplicateNode: 'Duplicate Node',
-    copy: 'Copy',
     myWorkflows: 'My Workflows',
     saveWorkflow: 'Save',
     saveWorkflowTitle: 'Save Workflow',
@@ -218,6 +305,7 @@ export default {
     sectionInput: 'Input',
     sectionGenerate: 'Generate',
     sectionTransform: 'Transform',
+    sectionAnnotation: 'Notes',
     sectionOutput: 'Output',
     save: 'Save',
     // New shortcuts and features
@@ -243,6 +331,160 @@ export default {
     ctrlZToUndo: 'Ctrl+Z to Undo',
     settingsForKey: 'Add API Key in Settings',
     dragToConnectNodes: 'Drag to Connect Nodes',
-    selectAndClickX: 'Select + Click ✕ to Cut'
+    selectAndClickX: 'Select + Click ✕ to Cut',
+    // BYOK Settings
+    bringYourOwnKey: 'Bring Your Own Key',
+    byokDesc: 'Use your own API keys instead of the server defaults',
+    deapiKey: 'deAPI Key',
+    iflowKey: 'iFlow Key',
+    iflowDesc: 'Use your own iFlow key for AI Assistant. Get your key at',
+    enterApiKey: 'Enter your deAPI API key',
+    enterIflowKey: 'Enter your iFlow key (if-...)',
+    saveKey: 'Save Key',
+    clearKey: 'Clear Key',
+    keySaved: 'Key saved successfully!',
+    keyCleared: 'Key cleared',
+    customKeyActive: 'Custom API key is active'
+  },
+
+  // Prompts Gallery
+  prompts: {
+    title: 'AI Prompts Gallery',
+    subtitle: 'Discover and use high-quality prompts for your creations',
+    prompts: 'prompts',
+    searchPlaceholder: 'Search prompts, tags, or keywords...',
+    allTags: 'All Tags',
+    filteringBy: 'Filtering by',
+    clearAll: 'Clear All',
+    loading: 'Loading prompts...',
+    noResults: 'No prompts found',
+    tryDifferent: 'Try adjusting your search or filters',
+    promptText: 'Prompt',
+    copyPrompt: 'Copy Prompt',
+    copied: 'Copied!',
+    model: 'Model',
+    id: 'ID',
+    showing: 'Showing',
+    of: 'of',
+    firstPage: 'First Page',
+    lastPage: 'Last Page',
+    prevPage: 'Previous Page',
+    nextPage: 'Next Page'
+  },
+
+  // Image Generator (NanoBanana)
+  imgGen: {
+    describeImage: 'Describe the image you want to create...',
+    addReference: 'Add reference image',
+    model: 'Model',
+    aspectRatio: 'Aspect Ratio'
+  },
+
+  // Ads Image Generator
+  adsImgGen: {
+    // Navigation
+    steps: ['Ad Type', 'Product Info', 'Style', 'Generate'],
+    // Step 1: Ad Type
+    selectAdType: 'Select Ad Type',
+    selectAdTypeDesc: 'Choose the type of static ad you want to create',
+    adTypes: {
+      product: 'Product Showcase',
+      social: 'Social Media Ad',
+      lifestyle: 'Lifestyle Editorial',
+      food: 'Food & Culinary',
+      corporate: 'Corporate/Professional',
+      marketing: 'Content/Marketing'
+    },
+    adTypesDesc: {
+      product: 'E-commerce style product photography with clean backgrounds',
+      social: 'Instagram/Facebook ad formats with text overlays and CTAs',
+      lifestyle: 'Authentic lifestyle moments with editorial polish',
+      food: 'Gourmet food photography for restaurants and food brands',
+      corporate: 'Business headshots, team photos, office environments',
+      marketing: 'Flat-lays, social templates, promotional content'
+    },
+    // Step 2: Product Info
+    productInfo: 'Product/Brand Information',
+    productInfoDesc: 'Tell us about your product or brand',
+    productName: 'Product/Brand Name',
+    productNamePlaceholder: 'e.g., Premium Skincare Serum',
+    description: 'Description',
+    descriptionPlaceholder: 'Brief product description or key features',
+    headline: 'Headline',
+    headlinePlaceholder: 'e.g., NEW ARRIVAL',
+    ctaText: 'Call-to-Action Text',
+    ctaPlaceholder: 'e.g., Shop Now, Learn More',
+    subject: 'Subject/Person',
+    subjectPlaceholder: 'e.g., Young professional woman',
+    action: 'Action',
+    actionPlaceholder: 'e.g., using, enjoying, demonstrating',
+    setting: 'Setting/Environment',
+    settingPlaceholder: 'e.g., modern apartment living room',
+    foodItem: 'Food Item',
+    foodItemPlaceholder: 'e.g., Gourmet Burger',
+    presentation: 'Presentation',
+    presentationPlaceholder: 'e.g., on rustic wooden board with garnish',
+    corpSubjectPlaceholder: 'e.g., Business executive in navy suit',
+    corpSettingPlaceholder: 'e.g., modern glass-walled conference room',
+    contentType: 'Content Type',
+    referenceImage: 'Reference Image (Optional)',
+    dragDropImage: 'Drag & drop product image here',
+    orClickUpload: 'or click to upload',
+    uploadHint: 'Upload a product photo to generate style-consistent ad variations',
+    // Step 3: Style
+    styleComposition: 'Style & Composition',
+    styleCompositionDesc: 'Customize the visual style of your ad',
+    visualStyle: 'Visual Style',
+    styles: {
+      minimal: 'Minimal Clean',
+      luxury: 'Luxury Premium',
+      lifestyle: 'Natural Lifestyle',
+      dramatic: 'Dramatic Bold',
+      fresh: 'Fresh Bright',
+      editorial: 'Editorial Magazine'
+    },
+    stylesDesc: {
+      minimal: 'Clean, simple backgrounds with soft shadows',
+      luxury: 'Elegant, high-end aesthetic with dramatic lighting',
+      lifestyle: 'Authentic, warm, approachable feel',
+      dramatic: 'High contrast, eye-catching visuals',
+      fresh: 'Bright, airy, optimistic mood',
+      editorial: 'Professional magazine-quality look'
+    },
+    composition: 'Composition',
+    compositions: {
+      closeup: 'Close-up',
+      medium: 'Medium Shot',
+      wide: 'Wide Shot',
+      overhead: 'Overhead/Flat-lay',
+      angle: 'Dynamic Angle',
+      centered: 'Centered Hero'
+    },
+    lighting: 'Lighting',
+    lightingOptions: {
+      natural: 'Natural Window',
+      golden: 'Golden Hour',
+      studio: 'Studio Soft',
+      dramatic: 'Dramatic',
+      highkey: 'High-Key Bright',
+      rim: 'Rim Light'
+    },
+    aspectRatio: 'Aspect Ratio',
+    // Step 4: Generate
+    generateAd: 'Generate Your Ad',
+    generateAdDesc: 'Review your prompt and generate the ad image',
+    generatedPrompt: 'Generated Prompt',
+    editPrompt: 'Edit Prompt',
+    cancel: 'Cancel',
+    apply: 'Apply',
+    generating: 'Generating...',
+    generatingDesc: 'This may take up to 2 minutes',
+    download: 'Download',
+    regenerate: 'Regenerate',
+    useAsRef: 'Use as Reference',
+    clickGenerate: 'Click Generate to create your ad',
+    generate: 'Generate',
+    back: 'Back',
+    next: 'Next'
   }
 }

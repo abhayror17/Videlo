@@ -19,13 +19,16 @@ from ..schemas import (
     Txt2VideoRequest,
     Img2VideoRequest,
     Txt2MusicRequest,
+    Txt2AudioRequest,
     Txt2EmbeddingRequest,
     EmbeddingResponse,
     Vid2TxtRequest,
     Aud2TxtRequest,
     TranscriptionResponse,
     PromptEnhanceRequest,
-    PromptEnhanceResponse
+    PromptEnhanceResponse,
+    NanoBananaRequest,
+    NanoBananaResponse
 )
 from ..services.deapi import get_deapi_client
 
@@ -527,6 +530,112 @@ async def create_txt2music(
         db.refresh(generation)
         
         background_tasks.add_task(poll_for_result, generation.uuid, generation.id)
+        
+        return generation
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        generation.status = "failed"
+        generation.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# TEXT-TO-AUDIO / TTS
+# ============================================================
+
+@router.post("/generate/txt2audio", response_model=GenerationResponse)
+async def create_txt2audio(
+    background_tasks: BackgroundTasks,
+    text: str = Form(...),
+    model: str = Form("Kokoro"),
+    voice: str = Form(None),
+    lang: str = Form("en-us"),
+    speed: float = Form(1.0),
+    format: str = Form("mp3"),
+    sample_rate: int = Form(24000),
+    mode: str = Form("custom_voice"),
+    ref_audio: UploadFile = File(None),
+    ref_text: str = Form(None),
+    instruct: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Submit a text-to-speech generation request to deAPI.
+    
+    Supported models:
+    - Kokoro: Fast, high-quality TTS with multiple languages and voices
+    - Chatterbox: 23 languages, custom voice support
+    - Qwen3_TTS_12Hz_1_7B_CustomVoice: Custom voice selection
+    - Qwen3_TTS_12Hz_1_7B_Base: Voice cloning from reference audio
+    - Qwen3_TTS_12Hz_1_7B_VoiceDesign: Voice design from instructions
+    
+    Modes:
+    - custom_voice: Select from predefined voices (default)
+    - voice_clone: Clone voice from reference audio (requires ref_audio)
+    - voice_design: Design voice from text instructions (requires instruct)
+    """
+    client = get_deapi_client()
+    
+    # Set default voice based on model if not provided
+    if not voice:
+        if model == "Kokoro":
+            voice = "af_sky"
+        elif model == "Chatterbox":
+            voice = "default"
+        elif model.startswith("Qwen3_TTS"):
+            voice = "Vivian"
+        else:
+            voice = "default"
+    
+    # Create pending record
+    generation = Generation(
+        prompt=text[:500],  # Store truncated text as prompt
+        model=model,
+        generation_type="txt2audio",
+        status="pending",
+        progress=0
+    )
+    db.add(generation)
+    db.commit()
+    db.refresh(generation)
+    
+    try:
+        # Handle reference audio for voice cloning
+        ref_audio_content = None
+        if ref_audio and ref_audio.filename:
+            ref_audio_content = await ref_audio.read()
+        
+        # Call deAPI txt2audio endpoint
+        result = await client.generate_txt2audio(
+            text=text,
+            model=model,
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            format=format,
+            sample_rate=sample_rate,
+            mode=mode,
+            ref_audio=ref_audio_content,
+            ref_text=ref_text,
+            instruct=instruct
+        )
+        
+        # Update with request_id from deAPI
+        data = result.get("data", {})
+        generation.uuid = data.get("request_id")
+        generation.status = "processing"
+        
+        db.commit()
+        db.refresh(generation)
+        
+        # Start polling for result
+        background_tasks.add_task(
+            poll_for_result,
+            generation.uuid,
+            generation.id
+        )
         
         return generation
         
@@ -1242,6 +1351,96 @@ async def list_models(inference_type: Optional[str] = None):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# NANOBANANA IMAGE GENERATION
+# ============================================================
+
+@router.post("/generate/nanobanana", response_model=NanoBananaResponse)
+async def create_nanobanana_image(request: NanoBananaRequest):
+    """Generate an image using Nano Banana API (no credits required, guest mode)."""
+    from ..services.nanobanana import get_nanobanana_client, NanoBananaModel, AspectRatio
+    
+    client = get_nanobanana_client()
+    
+    # Validate model
+    try:
+        model = NanoBananaModel(request.model)
+    except ValueError:
+        model = NanoBananaModel.NANO_BANANA_2
+    
+    # Validate aspect ratio
+    try:
+        aspect_ratio = AspectRatio(request.aspect_ratio)
+    except ValueError:
+        aspect_ratio = AspectRatio.SQUARE
+    
+    # Start generation and wait for result
+    result = await client.generate_and_wait(
+        prompt=request.prompt,
+        model=model,
+        aspect_ratio=aspect_ratio,
+        reference_images=request.reference_images,
+        max_wait_seconds=120,
+        poll_interval=5
+    )
+    
+    return NanoBananaResponse(
+        task_id=result.task_id or "",
+        status=result.status or ("success" if result.success else "failed"),
+        image_urls=result.image_urls,
+        error=result.error
+    )
+
+
+@router.post("/generate/nanobanana/start")
+async def start_nanobanana_image(request: NanoBananaRequest):
+    """Start a Nano Banana image generation (returns task ID for polling)."""
+    from ..services.nanobanana import get_nanobanana_client, NanoBananaModel, AspectRatio
+    
+    client = get_nanobanana_client()
+    
+    try:
+        model = NanoBananaModel(request.model)
+    except ValueError:
+        model = NanoBananaModel.NANO_BANANA_2
+    
+    try:
+        aspect_ratio = AspectRatio(request.aspect_ratio)
+    except ValueError:
+        aspect_ratio = AspectRatio.SQUARE
+    
+    result = await client.generate_image(
+        prompt=request.prompt,
+        model=model,
+        aspect_ratio=aspect_ratio,
+        reference_images=request.reference_images
+    )
+    
+    return {
+        "success": result.success,
+        "task_id": result.task_id,
+        "status": result.status,
+        "error": result.error
+    }
+
+
+@router.post("/generate/nanobanana/query")
+async def query_nanobanana_task(task_id: str = Form(...), prompt: str = Form(...)):
+    """Query the status of a Nano Banana generation task."""
+    from ..services.nanobanana import get_nanobanana_client
+    
+    client = get_nanobanana_client()
+    result = await client.query_task(task_id, prompt)
+    
+    return {
+        "success": result.success,
+        "task_id": result.task_id,
+        "status": result.status,
+        "image_urls": result.image_urls,
+        "error": result.error
+    }
 
 
 @router.get("/health", response_model=HealthResponse)

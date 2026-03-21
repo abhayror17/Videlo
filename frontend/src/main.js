@@ -8,6 +8,9 @@ import Home from './views/Home.vue'
 import ImageEdit from './views/ImageEdit.vue'
 import AdGenerator from './views/AdGenerator.vue'
 import Workflow from './views/Workflow.vue'
+import PromptsGallery from './views/PromptsGallery.vue'
+import ImgGen from './views/ImgGen.vue'
+import AdsImgGen from './views/AdsImgGen.vue'
 
 const routes = [
   {
@@ -51,10 +54,28 @@ const routes = [
     meta: { mode: 'gallery', title: 'nav.gallery' }
   },
   {
+    path: '/prompts',
+    name: 'prompts',
+    component: PromptsGallery,
+    meta: { title: 'nav.prompts' }
+  },
+  {
     path: '/workflow',
     name: 'workflow',
     component: Workflow,
     meta: { title: 'nav.workflow' }
+  },
+  {
+    path: '/img-gen',
+    name: 'img-gen',
+    component: ImgGen,
+    meta: { title: 'nav.imgGen' }
+  },
+  {
+    path: '/ads-img-gen',
+    name: 'ads-img-gen',
+    component: AdsImgGen,
+    meta: { title: 'nav.adsImgGen' }
   }
 ]
 

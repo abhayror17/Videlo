@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
-from .routes import generations, prompts, ads, workflow, credits
+from .routes import generations, prompts, ads, workflow
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,7 +27,6 @@ app.include_router(generations.router)
 app.include_router(prompts.router)
 app.include_router(ads.router)
 app.include_router(workflow.router)
-app.include_router(credits.router)
 
 
 @app.on_event("startup")

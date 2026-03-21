@@ -1,0 +1,333 @@
+================================================================================
+                    NANO BANANA PROMPT API DOCUMENTATION
+                    https://nanobananaprompt.club
+================================================================================
+
+================================================================================
+1. PROMPTS GALLERY API
+================================================================================
+
+Endpoint: GET /api/prompts
+
+Query Parameters:
+  - tags: string (e.g., "marketing", "photography", "cinematic", "product")
+  - page: integer (default: 1)
+  - limit: integer (default: 50)
+
+Example Request:
+  GET https://nanobananaprompt.club/api/prompts?tags=marketing&page=1&limit=10
+
+Response:
+{
+  "hasMore": true,
+  "items": [
+    {
+      "id": "gp_d18a95a40c17a9913be911853aa8d666",
+      "imageUrl": "https://static.nanobananaprompt.club/prompt-media/.../image.jpg",
+      "imageUrls": ["https://static.nanobananaprompt.club/.../image.jpg"],
+      "prompt": "Ultra-realistic lifestyle product portrait...",
+      "title": "Ultra-realistic lifestyle product portrait...",
+      "model": "kie",
+      "createdAt": "2026-03-17T07:50:13.389Z",
+      "tags": ["marketing", "photography", "portrait-selfie"],
+      "user": {
+        "id": "gp_d18a95a40c17a9913be911853aa8d666",
+        "name": "Guest Creator",
+        "avatar": "/imgs/avatars/1.png",
+        "createdAt": "2026-03-17T07:50:13.389Z"
+      },
+      "reviewStatus": "visible",
+      "showOnHome": false,
+      "homeStatus": "hidden",
+      "sourceUrl": "https://static.nanobananaprompt.club/..."
+    }
+  ],
+  "page": 1,
+  "total": 344
+}
+
+Available Tags:
+  - marketing
+  - product
+  - photography
+  - cinematic
+  - minimal
+  - portrait-selfie
+  - food-drink
+  - ecommerce
+  - fashion-item
+  - text-layout
+  - abstract-background
+  - render-3d
+  - cyberpunk-scifi
+  - anime-comic
+  - illustration
+  - vehicle
+
+
+================================================================================
+2. IMAGE GENERATION API
+================================================================================
+
+The image generation is a two-step process:
+  1. Submit generation request -> get taskId
+  2. Poll for results using taskId
+
+
+--------------------------------------------------------------------------------
+Step 1: Generate Image
+--------------------------------------------------------------------------------
+
+Endpoint: POST /api/ai/generate
+Content-Type: application/json
+
+Request Body:
+{
+  "mediaType": "image",
+  "scene": "text-to-image",
+  "provider": "kie",
+  "model": "nano-banana-2",
+  "prompt": "your prompt here",
+  "options": {
+    "aspect_ratio": "1:1"
+  }
+}
+
+Parameters:
+  - mediaType: "image" (required)
+  - scene: "text-to-image" or "image-to-image" (required)
+  - provider: "kie" (required)
+  - model: "nano-banana-2" or "nano-banana-pro" (required)
+  - prompt: string (required)
+  - options.aspect_ratio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" (optional)
+
+For Image-to-Image:
+  - options.image_input: array of image URLs (required for image-to-image)
+
+Response (Success):
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": "guest_eyJwcm92aWRlciI6ImtpZSIsInRhc2tJZCI6IjNjODMwZDIyNjI0NjYwMDg1N2M0YjkzNWFiNDgyM2M0IiwibWVkaWFUeXBlIjoiaW1hZ2UiLCJtb2RlbCI6Im5hbm8tYmFuYW5hLTIifQ",
+    "status": "pending",
+    "taskInfo": "{}",
+    "taskResult": "{\"taskId\":\"3c830d226246600857c4b935ab4823c4\",\"recordId\":\"...\"}",
+    "provider": "kie",
+    "model": "nano-banana-2",
+    "prompt": "a cute cat",
+    "guestUsageUsed": 1,
+    "guestUsageRemaining": 2
+  }
+}
+
+The "id" field is the taskId used for polling.
+
+
+--------------------------------------------------------------------------------
+Step 2: Poll for Result
+--------------------------------------------------------------------------------
+
+Endpoint: POST /api/ai/query
+Content-Type: application/json
+
+Request Body:
+{
+  "taskId": "guest_eyJ...",
+  "prompt": "your prompt"
+}
+
+Response (Pending):
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": "guest_eyJ...",
+    "taskId": "3c830d226246600857c4b935ab4823c4",
+    "status": "pending",
+    "provider": "kie",
+    "model": "nano-banana-2",
+    "prompt": "a cute cat",
+    "taskInfo": "{\"status\":\"waiting\",\"errorCode\":null,\"errorMessage\":null,\"createTime\":\"2026-03-17T17:13:05.001Z\"}",
+    "taskResult": "..."
+  }
+}
+
+Response (Processing):
+{
+  "code": 0,
+  "data": {
+    "status": "processing",
+    "taskInfo": "{\"status\":\"processing\",...}"
+  }
+}
+
+Response (Success/Completed):
+{
+  "code": 0,
+  "data": {
+    "id": "...",
+    "status": "success",
+    "taskInfo": "{\"output\":[\"https://image-url-1.jpg\",\"https://image-url-2.jpg\"]}",
+    "prompt": "..."
+  }
+}
+
+Response (Failed):
+{
+  "code": 0,
+  "data": {
+    "status": "failed",
+    "taskInfo": "{\"errorMessage\":\"...\"}"
+  }
+}
+
+Status Values:
+  - pending
+  - processing
+  - success
+  - failed
+  - canceled
+
+
+================================================================================
+3. MODELS
+================================================================================
+
+| Key              | Provider | Title            | Description                              |
+|------------------|----------|------------------|------------------------------------------|
+| nano-banana-2    | kie      | Nano Banana 2    | Fast generation for everyday visuals     |
+| nano-banana-pro  | kie      | Nano Banana Pro  | Higher fidelity, stronger prompt adher.  |
+
+
+================================================================================
+4. ASPECT RATIOS
+================================================================================
+
+| Value | Label   | Shape       |
+|-------|---------|-------------|
+| 1:1   | Square  | Square      |
+| 16:9  | 16:9    | Landscape   |
+| 9:16  | 9:16    | Portrait    |
+| 3:4   | 3:4     | Portrait    |
+| 4:3   | 4:3     | Landscape   |
+
+
+================================================================================
+5. GUEST USAGE LIMITS
+================================================================================
+
+- Guest users get 3 free generations
+- Tracked via cookie: "nbp_guest_image_generations_used"
+- Response includes:
+  - guestUsageUsed: number of generations used
+  - guestUsageRemaining: number remaining
+
+To track usage:
+  - Cookie name: nbp_guest_image_generations_used
+  - Max value: 3
+  - Stored for 365 days
+
+
+--------------------------------------------------------------------------------
+BYPASS FOR TESTING (YOUR OWN SERVICE)
+--------------------------------------------------------------------------------
+
+The server reads the cookie from the request. To reset guest usage:
+
+Option 1: Set cookie to 0 before each request
+  session.cookies.set('nbp_guest_image_generations_used', '0', domain='.nanobananaprompt.club')
+
+Option 2: Don't send the cookie at all (fresh session)
+
+Option 3: Clear cookie in browser DevTools:
+  Application > Cookies > nanobananaprompt.club > Delete "nbp_guest_image_generations_used"
+
+
+================================================================================
+6. PYTHON EXAMPLE
+================================================================================
+
+import requests
+import time
+import json
+
+BASE_URL = "https://nanobananaprompt.club"
+
+def generate_image(prompt, model="nano-banana-2", aspect_ratio="1:1", bypass_guest_limit=True):
+    """Generate an image and return the result URLs"""
+    
+    session = requests.Session()
+    
+    # BYPASS: Reset guest usage cookie to get unlimited generations
+    if bypass_guest_limit:
+        session.cookies.set('nbp_guest_image_generations_used', '0', domain='.nanobananaprompt.club')
+    
+    # Step 1: Submit generation request
+    response = session.post(
+        f"{BASE_URL}/api/ai/generate",
+        json={
+            "mediaType": "image",
+            "scene": "text-to-image",
+            "provider": "kie",
+            "model": model,
+            "prompt": prompt,
+            "options": {"aspect_ratio": aspect_ratio}
+        },
+        headers={"Content-Type": "application/json"}
+    )
+    
+    data = response.json()
+    if data["code"] != 0:
+        raise Exception(data["message"])
+    
+    task_id = data["data"]["id"]
+    print(f"Task created: {task_id}")
+    
+    # Step 2: Poll for results
+    while True:
+        time.sleep(5)  # Wait 5 seconds between polls
+        
+        response = session.post(
+            f"{BASE_URL}/api/ai/query",
+            json={"taskId": task_id, "prompt": prompt},
+            headers={"Content-Type": "application/json"}
+        )
+        
+        data = response.json()
+        status = data["data"]["status"]
+        print(f"Status: {status}")
+        
+        if status == "success":
+            task_info = json.loads(data["data"]["taskInfo"])
+            return task_info.get("output", [])
+        
+        elif status == "failed":
+            task_info = json.loads(data["data"]["taskInfo"])
+            raise Exception(task_info.get("errorMessage", "Generation failed"))
+        
+        elif status in ["pending", "processing"]:
+            continue
+        
+        else:
+            raise Exception(f"Unknown status: {status}")
+
+
+# Usage example
+if __name__ == "__main__":
+    images = generate_image("a cute cat sitting on a windowsill")
+    print(f"Generated images: {images}")
+
+
+================================================================================
+7. NOTES
+================================================================================
+
+- The API is rate-limited for guest users (3 generations) - BYPASS: set cookie to 0
+- Polling interval: recommended 3-5 seconds
+- Generation typically takes 10-30 seconds
+- Images are hosted on: static.nanobananaprompt.club
+- For authenticated users, credits are tracked server-side
+- To test unlimited times: always set nbp_guest_image_generations_used=0
+
+================================================================================

@@ -19,20 +19,49 @@
     <div class="node-body">
       <div class="form-row">
         <label>{{ $t('settings.model') }}</label>
-        <select v-model="localData.model" @change="updateData" class="form-select">
+        <select v-model="localData.model" @change="onModelChange" class="form-select">
           <option value="Kokoro">Kokoro</option>
+          <option value="Chatterbox">Chatterbox</option>
+          <option value="Qwen3_TTS_12Hz_1_7B_CustomVoice">Qwen3 TTS</option>
+          <option value="Qwen3_TTS_12Hz_1_7B_Base">Qwen3 Voice Clone</option>
+          <option value="Qwen3_TTS_12Hz_1_7B_VoiceDesign">Qwen3 Voice Design</option>
         </select>
       </div>
+      
+      <!-- Language Selection -->
       <div class="form-row">
-        <label>Voice</label>
+        <label>{{ $t('settings.language') }}</label>
+        <select v-model="localData.lang" @change="onLangChange" class="form-select">
+          <option v-for="lang in availableLanguages" :key="lang.code" :value="lang.code">
+            {{ lang.name }}
+          </option>
+        </select>
+      </div>
+      
+      <!-- Voice Selection (for custom_voice mode) -->
+      <div v-if="localData.model !== 'Qwen3_TTS_12Hz_1_7B_VoiceDesign'" class="form-row">
+        <label>{{ $t('settings.voice') }}</label>
         <select v-model="localData.voice" @change="updateData" class="form-select">
-          <option value="af_sky">Sky (Female)</option>
-          <option value="af_bella">Bella (Female)</option>
-          <option value="am_michael">Michael (Male)</option>
+          <option v-for="voice in availableVoices" :key="voice.id" :value="voice.id">
+            {{ voice.name }}
+          </option>
         </select>
       </div>
+      
+      <!-- Voice Design Instructions (for voice_design mode) -->
+      <div v-if="localData.model === 'Qwen3_TTS_12Hz_1_7B_VoiceDesign'" class="form-row">
+        <label>{{ $t('settings.voiceDesign') }}</label>
+        <textarea 
+          v-model="localData.instruct" 
+          @change="updateData" 
+          class="form-textarea"
+          :placeholder="$t('settings.voiceDesignPlaceholder')"
+          rows="2"
+        ></textarea>
+      </div>
+      
       <div class="form-row">
-        <label>Speed</label>
+        <label>{{ $t('settings.speed') }}</label>
         <div class="slider-wrapper">
           <input type="range" v-model.number="localData.speed" @change="updateData" min="0.5" max="2" step="0.1" class="form-slider" />
           <span class="slider-value">{{ localData.speed }}x</span>
@@ -65,11 +94,164 @@ const props = defineProps({
 
 const { updateNodeData, removeNodes } = useVueFlow()
 
+// Voice definitions per model and language
+const VOICES = {
+  Kokoro: {
+    'en-us': [
+      { id: 'af_sky', name: 'Sky (Female)' },
+      { id: 'af_bella', name: 'Bella (Female)' },
+      { id: 'af_nicole', name: 'Nicole (Female)' },
+      { id: 'af_sarah', name: 'Sarah (Female)' },
+      { id: 'af_rose', name: 'Rose (Female)' },
+      { id: 'am_michael', name: 'Michael (Male)' },
+      { id: 'am_adam', name: 'Adam (Male)' },
+      { id: 'am_eric', name: 'Eric (Male)' }
+    ],
+    'en-gb': [
+      { id: 'bf_emma', name: 'Emma (Female)' },
+      { id: 'bf_isabella', name: 'Isabella (Female)' },
+      { id: 'bm_george', name: 'George (Male)' },
+      { id: 'bm_lewis', name: 'Lewis (Male)' }
+    ],
+    'es': [
+      { id: 'ef_dora', name: 'Dora (Female)' },
+      { id: 'em_alex', name: 'Alex (Male)' }
+    ],
+    'fr-fr': [
+      { id: 'ff_sihane', name: 'Sihane (Female)' }
+    ],
+    'hi': [
+      { id: 'hf_alpha', name: 'Alpha (Female)' },
+      { id: 'hf_beta', name: 'Beta (Female)' },
+      { id: 'hm_omega', name: 'Omega (Male)' }
+    ],
+    'it': [
+      { id: 'if_sara', name: 'Sara (Female)' },
+      { id: 'im_nicola', name: 'Nicola (Male)' }
+    ],
+    'pt-br': [
+      { id: 'pf_dora', name: 'Dora (Female)' },
+      { id: 'pm_alex', name: 'Alex (Male)' }
+    ]
+  },
+  Chatterbox: {
+    'en': [{ id: 'default', name: 'Default' }],
+    'zh': [{ id: 'default', name: 'Default' }],
+    'ja': [{ id: 'default', name: 'Default' }],
+    'ko': [{ id: 'default', name: 'Default' }],
+    'de': [{ id: 'default', name: 'Default' }],
+    'fr': [{ id: 'default', name: 'Default' }],
+    'es': [{ id: 'default', name: 'Default' }],
+    'it': [{ id: 'default', name: 'Default' }],
+    'pt': [{ id: 'default', name: 'Default' }],
+    'ru': [{ id: 'default', name: 'Default' }],
+    'ar': [{ id: 'default', name: 'Default' }],
+    'hi': [{ id: 'default', name: 'Default' }]
+  },
+  Qwen3_TTS_12Hz_1_7B_CustomVoice: {
+    'English': [
+      { id: 'Vivian', name: 'Vivian (Female)' },
+      { id: 'Serena', name: 'Serena (Female)' },
+      { id: 'Dylan', name: 'Dylan (Male)' },
+      { id: 'Eric', name: 'Eric (Male)' },
+      { id: 'Aiden', name: 'Aiden (Male)' },
+      { id: 'Ryan', name: 'Ryan (Male)' }
+    ],
+    'Chinese': [
+      { id: 'Vivian', name: 'Vivian (Female)' },
+      { id: 'Uncle_Fu', name: 'Uncle Fu (Male)' }
+    ],
+    'Japanese': [
+      { id: 'Ono_Anna', name: 'Anna (Female)' },
+      { id: 'Ryan', name: 'Ryan (Male)' }
+    ],
+    'Korean': [
+      { id: 'Sohee', name: 'Sohee (Female)' },
+      { id: 'Ryan', name: 'Ryan (Male)' }
+    ]
+  },
+  Qwen3_TTS_12Hz_1_7B_Base: {
+    'English': [{ id: 'default', name: 'Clone from Audio' }],
+    'Chinese': [{ id: 'default', name: 'Clone from Audio' }],
+    'Japanese': [{ id: 'default', name: 'Clone from Audio' }],
+    'Korean': [{ id: 'default', name: 'Clone from Audio' }]
+  },
+  Qwen3_TTS_12Hz_1_7B_VoiceDesign: {
+    'English': [{ id: 'designed', name: 'AI Designed Voice' }],
+    'Chinese': [{ id: 'designed', name: 'AI Designed Voice' }],
+    'Japanese': [{ id: 'designed', name: 'AI Designed Voice' }],
+    'Korean': [{ id: 'designed', name: 'AI Designed Voice' }]
+  }
+}
+
+const LANGUAGES = {
+  Kokoro: [
+    { code: 'en-us', name: 'English (US)' },
+    { code: 'en-gb', name: 'English (UK)' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr-fr', name: 'French' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'it', name: 'Italian' },
+    { code: 'pt-br', name: 'Portuguese (BR)' }
+  ],
+  Chatterbox: [
+    { code: 'en', name: 'English' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'de', name: 'German' },
+    { code: 'fr', name: 'French' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'it', name: 'Italian' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'ru', name: 'Russian' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'hi', name: 'Hindi' }
+  ],
+  Qwen3_TTS_12Hz_1_7B_CustomVoice: [
+    { code: 'English', name: 'English' },
+    { code: 'Chinese', name: 'Chinese' },
+    { code: 'Japanese', name: 'Japanese' },
+    { code: 'Korean', name: 'Korean' },
+    { code: 'German', name: 'German' },
+    { code: 'French', name: 'French' },
+    { code: 'Spanish', name: 'Spanish' },
+    { code: 'Portuguese', name: 'Portuguese' },
+    { code: 'Italian', name: 'Italian' },
+    { code: 'Russian', name: 'Russian' }
+  ],
+  Qwen3_TTS_12Hz_1_7B_Base: [
+    { code: 'English', name: 'English' },
+    { code: 'Chinese', name: 'Chinese' },
+    { code: 'Japanese', name: 'Japanese' },
+    { code: 'Korean', name: 'Korean' },
+    { code: 'German', name: 'German' },
+    { code: 'French', name: 'French' },
+    { code: 'Spanish', name: 'Spanish' },
+    { code: 'Portuguese', name: 'Portuguese' },
+    { code: 'Italian', name: 'Italian' },
+    { code: 'Russian', name: 'Russian' }
+  ],
+  Qwen3_TTS_12Hz_1_7B_VoiceDesign: [
+    { code: 'English', name: 'English' },
+    { code: 'Chinese', name: 'Chinese' },
+    { code: 'Japanese', name: 'Japanese' },
+    { code: 'Korean', name: 'Korean' },
+    { code: 'German', name: 'German' },
+    { code: 'French', name: 'French' },
+    { code: 'Spanish', name: 'Spanish' },
+    { code: 'Portuguese', name: 'Portuguese' },
+    { code: 'Italian', name: 'Italian' },
+    { code: 'Russian', name: 'Russian' }
+  ]
+}
+
 const localData = ref({
   model: props.data.model || 'Kokoro',
   voice: props.data.voice || 'af_sky',
   lang: props.data.lang || 'en-us',
   speed: props.data.speed || 1,
+  instruct: props.data.instruct || '',
   resultUrl: props.data.resultUrl || null,
   status: props.data.status || 'idle'
 })
@@ -79,6 +261,45 @@ watch(() => props.data, (newData) => {
 }, { deep: true })
 
 const isProcessing = computed(() => localData.value.status === 'processing')
+
+const availableLanguages = computed(() => {
+  return LANGUAGES[localData.value.model] || LANGUAGES['Kokoro']
+})
+
+const availableVoices = computed(() => {
+  const modelVoices = VOICES[localData.value.model]
+  if (!modelVoices) return VOICES['Kokoro']['en-us']
+  return modelVoices[localData.value.lang] || Object.values(modelVoices)[0] || []
+})
+
+const onModelChange = () => {
+  // Reset to first available language for the new model
+  const langs = LANGUAGES[localData.value.model]
+  if (langs && langs.length > 0) {
+    localData.value.lang = langs[0].code
+  }
+  // Reset to first available voice
+  const voices = VOICES[localData.value.model]
+  if (voices) {
+    const langVoices = voices[localData.value.lang] || Object.values(voices)[0]
+    if (langVoices && langVoices.length > 0) {
+      localData.value.voice = langVoices[0].id
+    }
+  }
+  updateData()
+}
+
+const onLangChange = () => {
+  // Reset to first available voice for the new language
+  const voices = VOICES[localData.value.model]
+  if (voices) {
+    const langVoices = voices[localData.value.lang]
+    if (langVoices && langVoices.length > 0) {
+      localData.value.voice = langVoices[0].id
+    }
+  }
+  updateData()
+}
 
 const updateData = () => {
   updateNodeData(props.id, { ...localData.value })
@@ -259,6 +480,30 @@ const deleteNode = () => {
   border-color: rgba(139, 92, 246, 0.6);
   background: rgba(0, 0, 0, 0.5);
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+  transition: all 0.2s ease;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.form-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .slider-wrapper {
