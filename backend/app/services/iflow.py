@@ -5,13 +5,6 @@ from ..config import get_settings
 
 settings = get_settings()
 
-# Debug: Print API key status (masked for security)
-api_key = settings.iflow_api_key
-print(f"[iFlow] API Key loaded: {'Yes' if api_key else 'No'}")
-print(f"[iFlow] API Key length: {len(api_key) if api_key else 0}")
-print(f"[iFlow] API Key prefix: {api_key[:10] + '...' if api_key and len(api_key) > 10 else 'N/A'}")
-print(f"[iFlow] Base URL: {settings.iflow_base_url}")
-
 
 class iFlowClient:
     """iFlow API Client for AI Assistant and text generation capabilities."""

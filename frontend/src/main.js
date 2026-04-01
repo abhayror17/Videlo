@@ -6,11 +6,12 @@ import i18n from './i18n'
 // Views
 import Home from './views/Home.vue'
 import ImageEdit from './views/ImageEdit.vue'
-import AdGenerator from './views/AdGenerator.vue'
 import Workflow from './views/Workflow.vue'
 import PromptsGallery from './views/PromptsGallery.vue'
 import ImgGen from './views/ImgGen.vue'
-import AdsImgGen from './views/AdsImgGen.vue'
+import AdGenerator from './views/AdGenerator.vue'
+import AiAvatar from './views/AiAvatar.vue'
+import UgcAdsCreator from './views/UgcAdsCreator.vue'
 
 const routes = [
   {
@@ -42,18 +43,6 @@ const routes = [
     meta: { mode: 'img2video', title: 'nav.img2video' }
   },
   {
-    path: '/ads',
-    name: 'ads',
-    component: AdGenerator,
-    meta: { title: 'nav.ads' }
-  },
-  {
-    path: '/gallery',
-    name: 'gallery',
-    component: Home,
-    meta: { mode: 'gallery', title: 'nav.gallery' }
-  },
-  {
     path: '/prompts',
     name: 'prompts',
     component: PromptsGallery,
@@ -72,10 +61,22 @@ const routes = [
     meta: { title: 'nav.imgGen' }
   },
   {
-    path: '/ads-img-gen',
-    name: 'ads-img-gen',
-    component: AdsImgGen,
-    meta: { title: 'nav.adsImgGen' }
+    path: '/ads',
+    name: 'ads',
+    component: AdGenerator,
+    meta: { title: 'nav.ads' }
+  },
+  {
+    path: '/avatar',
+    name: 'avatar',
+    component: AiAvatar,
+    meta: { title: 'nav.avatar' }
+  },
+  {
+    path: '/ugc-ads',
+    name: 'ugc-ads',
+    component: UgcAdsCreator,
+    meta: { title: 'UGC AI Ads Creator' }
   }
 ]
 

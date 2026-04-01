@@ -56,6 +56,10 @@ def _run_migrations():
             if 'credits_charged' not in columns:
                 conn.execute(text('ALTER TABLE generations ADD COLUMN credits_charged INTEGER'))
                 conn.commit()
+            
+            if 'local_path' not in columns:
+                conn.execute(text('ALTER TABLE generations ADD COLUMN local_path VARCHAR'))
+                conn.commit()
     
     # Migration: Create users table if it doesn't exist (run once)
     if 'users' not in existing_tables:
@@ -240,3 +244,63 @@ def _run_migrations():
             )
         '''))
         conn.commit()
+        
+        # ai_avatar_projects - AI Video Avatar Pipeline
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS ai_avatar_projects (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(100),
+                portrait_prompt TEXT NOT NULL,
+                speech_text TEXT NOT NULL,
+                motion_prompt TEXT,
+                voice_model VARCHAR(50) DEFAULT 'Kokoro',
+                voice_id VARCHAR(50) DEFAULT 'af_sky',
+                voice_speed REAL DEFAULT 1.0,
+                voice_lang VARCHAR(20) DEFAULT 'en-us',
+                portrait_model VARCHAR(50) DEFAULT 'Flux_2_Klein_4B_BF16',
+                portrait_width INTEGER DEFAULT 512,
+                portrait_height INTEGER DEFAULT 512,
+                animation_model VARCHAR(50) DEFAULT 'Ltx2_3_22B_Dist_INT8',
+                animation_frames INTEGER DEFAULT 97,
+                animation_fps INTEGER DEFAULT 24,
+                portrait_request_id VARCHAR,
+                portrait_url VARCHAR,
+                portrait_generation_id INTEGER,
+                portrait_status VARCHAR(50) DEFAULT 'pending',
+                audio_request_id VARCHAR,
+                audio_url VARCHAR,
+                audio_generation_id INTEGER,
+                audio_status VARCHAR(50) DEFAULT 'pending',
+                video_request_id VARCHAR,
+                video_url VARCHAR,
+                video_generation_id INTEGER,
+                video_status VARCHAR(50) DEFAULT 'pending',
+                current_step INTEGER DEFAULT 1,
+                overall_status VARCHAR(50) DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                FOREIGN KEY (portrait_generation_id) REFERENCES generations(id),
+                FOREIGN KEY (audio_generation_id) REFERENCES generations(id),
+                FOREIGN KEY (video_generation_id) REFERENCES generations(id)
+            )
+        '''))
+        conn.commit()
+    
+    # Migration: Add request_id columns to ai_avatar_projects if they don't exist
+    if 'ai_avatar_projects' in existing_tables:
+        columns = [col['name'] for col in inspector.get_columns('ai_avatar_projects')]
+        
+        with engine.connect() as conn:
+            if 'portrait_request_id' not in columns:
+                conn.execute(text('ALTER TABLE ai_avatar_projects ADD COLUMN portrait_request_id VARCHAR'))
+                conn.commit()
+            
+            if 'audio_request_id' not in columns:
+                conn.execute(text('ALTER TABLE ai_avatar_projects ADD COLUMN audio_request_id VARCHAR'))
+                conn.commit()
+            
+            if 'video_request_id' not in columns:
+                conn.execute(text('ALTER TABLE ai_avatar_projects ADD COLUMN video_request_id VARCHAR'))
+                conn.commit()

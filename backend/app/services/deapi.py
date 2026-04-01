@@ -7,13 +7,6 @@ from ..config import get_settings
 
 settings = get_settings()
 
-# Debug: Print API key status (masked for security)
-api_key = settings.deapi_api_key
-print(f"[DeAPI] API Key loaded: {'Yes' if api_key else 'No'}")
-print(f"[DeAPI] API Key length: {len(api_key) if api_key else 0}")
-print(f"[DeAPI] API Key prefix: {api_key[:10] + '...' if api_key and len(api_key) > 10 else 'N/A'}")
-print(f"[DeAPI] Base URL: {settings.deapi_base_url}")
-
 
 class DeAPIClient:
     def __init__(self, custom_api_key: Optional[str] = None):
@@ -83,21 +76,30 @@ class DeAPIClient:
         width: int = 512,
         height: int = 512,
         model: str = "Ltx2_3_22B_Dist_INT8",
-        guidance: float = 3.5,
-        steps: int = 20,
-        frames: int = 24,
+        frames: int = 97,
         seed: int = -1,
-        fps: int = 30
+        fps: int = 24
     ) -> dict:
-        """Submit text-to-video generation request to deAPI."""
+        """
+        Submit text-to-video generation request to deAPI.
+        
+        Note: Ltx2_3_22B_Dist_INT8 does NOT support steps or guidance.
+        
+        Args:
+            prompt: Text prompt for video generation
+            width: Output width (min 512, max 1024)
+            height: Output height (min 512, max 1024)
+            model: Model slug (default: Ltx2_3_22B_Dist_INT8)
+            frames: Number of frames (min 49, max 241)
+            seed: Random seed (-1 for random)
+            fps: Frames per second (fixed at 24)
+        """
         payload = {
             "prompt": prompt,
             "model": model,
-            "width": width,
-            "height": height,
-            "guidance": guidance,
-            "steps": steps,
-            "frames": frames,
+            "width": max(512, width),
+            "height": max(512, height),
+            "frames": max(49, frames),
             "seed": seed,
             "fps": fps
         }
@@ -111,7 +113,10 @@ class DeAPIClient:
                 f"{self.base_url}/api/v1/client/txt2video",
                 json=payload
             ) as response:
-                response.raise_for_status()
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"[txt2video] error response: {error_text}")
+                    response.raise_for_status()
                 return await response.json()
     
     async def generate_img2video(
@@ -121,23 +126,34 @@ class DeAPIClient:
         width: int = 512,
         height: int = 512,
         model: str = "Ltx2_3_22B_Dist_INT8",
-        guidance: float = 3.5,
-        steps: int = 20,
-        frames: int = 24,
+        frames: int = 97,
         seed: int = -1,
-        fps: int = 30,
+        fps: int = 24,
         last_frame_image: Optional[bytes] = None
     ) -> dict:
-        """Submit image-to-video generation request to deAPI."""
-        # Build multipart form data
+        """
+        Submit image-to-video generation request to deAPI.
+        
+        Note: Ltx2_3_22B_Dist_INT8 does NOT support steps or guidance.
+        
+        Args:
+            first_frame_image: Image bytes for first frame (required)
+            prompt: Motion prompt for video generation
+            width: Output width (min 512, max 1024)
+            height: Output height (min 512, max 1024)
+            model: Model slug (default: Ltx2_3_22B_Dist_INT8)
+            frames: Number of frames (min 49, max 241)
+            seed: Random seed (-1 for random)
+            fps: Frames per second (fixed at 24)
+            last_frame_image: Optional last frame image bytes
+        """
+        # Build multipart form data - NO steps or guidance for LTX-2.3
         data = aiohttp.FormData()
         data.add_field('first_frame_image', first_frame_image, filename='first_frame.png', content_type='image/png')
         data.add_field('prompt', prompt)
         data.add_field('model', model)
         data.add_field('width', str(width))
         data.add_field('height', str(height))
-        data.add_field('guidance', str(guidance))
-        data.add_field('steps', str(steps))
         data.add_field('frames', str(frames))
         data.add_field('seed', str(seed))
         data.add_field('fps', str(fps))
@@ -154,7 +170,10 @@ class DeAPIClient:
                 f"{self.base_url}/api/v1/client/img2video",
                 data=data
             ) as response:
-                response.raise_for_status()
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"[img2video] error response: {error_text}")
+                    response.raise_for_status()
                 return await response.json()
     
     async def generate_img2img(
@@ -402,6 +421,103 @@ class DeAPIClient:
                 return await response.json()
     
     # ============================================================
+    # AUDIO-TO-VIDEO (LTX-2.3 for AI Avatar Animation)
+    # ============================================================
+    
+    async def generate_aud2video(
+        self,
+        image_url: str,
+        audio_url: str,
+        prompt: str = "",
+        model: str = "Ltx2_3_22B_Dist_INT8",
+        width: int = 512,
+        height: int = 512,
+        frames: int = 97,
+        seed: int = -1,
+        fps: int = 24
+    ) -> dict:
+        """
+        Submit audio-to-video generation request to deAPI.
+        
+        This is the key endpoint for AI Avatar animation:
+        - Takes a portrait image URL and audio URL
+        - LTX-2.3 generates lip-synced animation with natural head movements
+        - Returns a complete talking avatar video
+        
+        Args:
+            image_url: URL to the portrait image (downloaded and uploaded as binary)
+            audio_url: URL to the audio file (downloaded and uploaded as binary)
+            prompt: Motion prompt for animation direction
+            model: LTX-2.3 model variant (default: Ltx2_3_22B_Dist_INT8)
+            width: Output video width (min 512, max 1024)
+            height: Output video height (min 512, max 1024)
+            frames: Number of frames to generate (min 49, max 241)
+            seed: Random seed (-1 for random)
+            fps: Frames per second (fixed at 24)
+            
+        Returns:
+            dict with request_id and status
+        """
+        # Fetch both image and audio files from URLs (API requires binary uploads)
+        async with aiohttp.ClientSession(
+            connector=self._create_connector(),
+            timeout=aiohttp.ClientTimeout(total=60)
+        ) as fetch_session:
+            # Fetch image
+            async with fetch_session.get(image_url) as img_response:
+                img_response.raise_for_status()
+                image_data = await img_response.read()
+                # Detect content type from response or extension
+                image_content_type = img_response.headers.get('Content-Type', 'image/png')
+                if image_url.lower().endswith('.jpg') or image_url.lower().endswith('.jpeg'):
+                    image_filename = 'portrait.jpg'
+                elif image_url.lower().endswith('.webp'):
+                    image_filename = 'portrait.webp'
+                else:
+                    image_filename = 'portrait.png'
+            
+            # Fetch audio
+            async with fetch_session.get(audio_url) as audio_response:
+                audio_response.raise_for_status()
+                audio_data = await audio_response.read()
+                # Detect content type from response or extension
+                audio_content_type = audio_response.headers.get('Content-Type', 'audio/mpeg')
+                if audio_url.lower().endswith('.wav'):
+                    audio_filename = 'speech.wav'
+                elif audio_url.lower().endswith('.flac'):
+                    audio_filename = 'speech.flac'
+                else:
+                    audio_filename = 'speech.mp3'
+        
+        # Build multipart form data - both files as binary uploads
+        # Note: Ltx2_3_22B_Dist_INT8 doesn't support steps/guidance
+        data = aiohttp.FormData()
+        data.add_field('audio', audio_data, filename=audio_filename, content_type=audio_content_type)
+        data.add_field('first_frame_image', image_data, filename=image_filename, content_type=image_content_type)
+        data.add_field('prompt', prompt)
+        data.add_field('model', model)
+        data.add_field('width', str(width))
+        data.add_field('height', str(height))
+        data.add_field('frames', str(frames))
+        data.add_field('seed', str(seed))
+        data.add_field('fps', str(fps))
+        
+        async with aiohttp.ClientSession(
+            connector=self._create_connector(),
+            headers=self.headers,
+            timeout=aiohttp.ClientTimeout(total=120)
+        ) as session:
+            async with session.post(
+                f"{self.base_url}/api/v1/client/aud2video",
+                data=data
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"[Avatar] aud2video error response: {error_text}")
+                    response.raise_for_status()
+                return await response.json()
+    
+    # ============================================================
     # TEXT-TO-EMBEDDING
     # ============================================================
     
@@ -628,6 +744,76 @@ class DeAPIClient:
                 return await response.json()
     
     # ============================================================
+    # VIDEO REPLACE (WAN 2.2 ANIMATE)
+    # ============================================================
+    
+    async def generate_video_replace(
+        self,
+        video: bytes,
+        character_image: bytes,
+        prompt: str = "",
+        model: str = "Wan_2_2_14B_Animate_Replace",
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        steps: int = 4,
+        seed: int = -1,
+        video_filename: str = "video.mp4",
+        image_filename: str = "character.png"
+    ) -> dict:
+        """
+        Submit video-replace request to deAPI using WAN 2.2 Animate.
+        
+        Replaces a person in a video with a character from a reference image.
+        The model copies body movements, facial expressions, and scene lighting.
+        
+        Args:
+            video: Video file bytes (MP4, MPEG, MOV, AVI, WMV, OGG)
+            character_image: Character reference image bytes (JPG, PNG, WebP)
+            prompt: Optional text prompt to guide the replacement
+            model: WAN 2.2 Animate model slug (default: Wan_2_2_14B_Animate_Replace)
+            width: Output video width (optional, uses input video width if omitted)
+            height: Output video height (optional, uses input video height if omitted)
+            steps: Number of inference steps (default: 4)
+            seed: Random seed (-1 for random)
+            video_filename: Name for the video file
+            image_filename: Name for the character image file
+            
+        Returns:
+            dict with request_id and status
+        """
+        # Build multipart form data
+        data = aiohttp.FormData()
+        data.add_field('video', video, filename=video_filename, content_type='video/mp4')
+        data.add_field('character_image', character_image, filename=image_filename, content_type='image/png')
+        data.add_field('model', model)
+        data.add_field('steps', str(steps))
+        data.add_field('seed', str(seed))
+        
+        if prompt:
+            data.add_field('prompt', prompt)
+        
+        if width:
+            data.add_field('width', str(width))
+        
+        if height:
+            data.add_field('height', str(height))
+        
+        async with aiohttp.ClientSession(
+            connector=self._create_connector(),
+            headers=self.headers,
+            timeout=aiohttp.ClientTimeout(total=300)  # 5 minutes for video processing
+        ) as session:
+            async with session.post(
+                f"{self.base_url}/api/v1/client/video-replace",
+                data=data
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"[video-replace] error response: {error_text}")
+                    response.raise_for_status()
+                return await response.json()
+    
+    # ============================================================
     # PROMPT ENHANCEMENT
     # ============================================================
     
@@ -771,6 +957,103 @@ class DeAPIClient:
             ) as response:
                 response.raise_for_status()
                 return await response.json()
+    
+    # ============================================================
+    # URL-BASED HELPER METHODS (for UGC Ads)
+    # ============================================================
+    
+    async def submit_text2img(
+        self,
+        prompt: str,
+        model: str = "Flux_2_Klein_4B_BF16",
+        width: int = 1024,
+        height: int = 768,
+        guidance: float = 3.5,
+        steps: int = 4,
+        seed: int = -1
+    ) -> dict:
+        """
+        Submit text-to-image and return result directly.
+        Convenience wrapper for UGC ads that returns the URL directly.
+        """
+        result = await self.generate_text2img(
+            prompt=prompt,
+            model=model,
+            width=width,
+            height=height,
+            guidance=guidance,
+            steps=steps,
+            seed=seed
+        )
+        
+        # Extract URL from response
+        data = result.get("data", result)
+        return {
+            "url": data.get("url") or data.get("image_url") or result.get("url"),
+            "request_id": result.get("request_id"),
+            "status": "completed"
+        }
+    
+    async def submit_img2video(
+        self,
+        image_url: str,
+        prompt: str,
+        model: str = "Ltx2_3_22B_Dist_INT8",
+        width: int = 768,
+        height: int = 768,
+        frames: int = 120,
+        seed: int = -1
+    ) -> dict:
+        """
+        Submit image-to-video from URL and return result directly.
+        Downloads image from URL and uploads to deAPI.
+        
+        Args:
+            image_url: URL to the source image
+            prompt: Motion prompt for video generation
+            model: Video model (default: Ltx2_3_22B_Dist_INT8)
+            width: Output width
+            height: Output height
+            frames: Number of frames (min 49, max 241)
+            seed: Random seed
+            
+        Returns:
+            dict with url and status
+        """
+        # Download image from URL
+        async with aiohttp.ClientSession(
+            connector=self._create_connector(),
+            timeout=aiohttp.ClientTimeout(total=60)
+        ) as session:
+            async with session.get(image_url) as response:
+                response.raise_for_status()
+                image_data = await response.read()
+                
+                # Detect content type
+                content_type = response.headers.get('Content-Type', 'image/png')
+                if 'jpeg' in content_type or 'jpg' in image_url.lower():
+                    filename = 'image.jpg'
+                else:
+                    filename = 'image.png'
+        
+        # Generate video from image bytes
+        result = await self.generate_img2video(
+            first_frame_image=image_data,
+            prompt=prompt,
+            model=model,
+            width=width,
+            height=height,
+            frames=frames,
+            seed=seed
+        )
+        
+        # Extract URL from response
+        data = result.get("data", result)
+        return {
+            "url": data.get("url") or data.get("video_url") or result.get("url"),
+            "request_id": result.get("request_id"),
+            "status": "completed"
+        }
 
 
 # Singleton client (for default server key)

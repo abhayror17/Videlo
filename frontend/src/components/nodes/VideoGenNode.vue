@@ -29,10 +29,8 @@
       </div>
       <div class="form-row">
         <label>{{ $t('settings.model') }}</label>
-        <select v-model="localData.model" @change="updateData" class="form-select">
-          <option value="Ltx2_3_22B_Dist_INT8">LTX-2.3 22B (Best)</option>
-          <option value="Ltx2_19B_Dist_FP8">LTX-2 19B</option>
-          <option value="Ltxv_13B_0_9_8_Distilled_FP8">LTX-Video 13B</option>
+        <select v-model="localData.model" @change="onModelChange" class="form-select">
+          <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }}</option>
         </select>
       </div>
       <div class="form-row">
@@ -44,9 +42,11 @@
       <div class="form-row">
         <label>{{ $t('settings.duration') }}</label>
         <select v-model.number="localData.frames" @change="updateData" class="form-select">
-          <option :value="49">~2 {{ $t('settings.seconds') }}</option>
-          <option :value="120">~5 {{ $t('settings.seconds') }}</option>
-          <option :value="241">~10 {{ $t('settings.seconds') }}</option>
+          <option :value="49">~2 sec (Short)</option>
+          <option :value="97">~4 sec (Medium)</option>
+          <option :value="120">~5 sec</option>
+          <option :value="161">~7 sec (Long)</option>
+          <option :value="241">~10 sec (Max)</option>
         </select>
       </div>
       
@@ -72,18 +72,28 @@ const props = defineProps({
 
 const { updateNodeData, removeNodes } = useVueFlow()
 
-// Aspect ratios for video
+// Models for video generation
+const models = [
+  { id: 'Ltx2_3_22B_Dist_INT8', name: 'LTX-2.3 22B (Recommended)', steps: 20 },
+  { id: 'Ltx2_19B_Dist_FP8', name: 'LTX-2 19B', steps: 20 },
+  { id: 'Ltxv_13B_0_9_8_Distilled_FP8', name: 'LTX-Video 13B', steps: 20 }
+]
+
+// Aspect ratios for video - LTX-2.3 supports 512-1024px
 const aspectRatios = [
-  { value: '16:9', label: '16:9 (Landscape)', width: 768, height: 432 },
-  { value: '9:16', label: '9:16 (Portrait)', width: 432, height: 768 },
-  { value: '1:1', label: '1:1 (Square)', width: 512, height: 512 },
+  { value: '16:9', label: '16:9 Landscape', width: 768, height: 432 },
+  { value: '16:9-hd', label: '16:9 HD', width: 1024, height: 576 },
+  { value: '9:16', label: '9:16 Portrait', width: 432, height: 768 },
+  { value: '9:16-hd', label: '9:16 HD', width: 576, height: 1024 },
+  { value: '1:1', label: '1:1 Square', width: 512, height: 512 },
+  { value: '1:1-hd', label: '1:1 HD', width: 1024, height: 1024 },
   { value: '4:3', label: '4:3', width: 640, height: 480 },
   { value: '3:4', label: '3:4', width: 480, height: 640 }
 ]
 
 const localData = ref({
   prompt: props.data.prompt || '',
-  model: props.data.model || 'Ltx2_3_22B_Dist_INT8',
+  model: props.data.model || models[0].id,
   aspectRatio: props.data.aspectRatio || '16:9',
   width: props.data.width || 768,
   height: props.data.height || 432,
@@ -92,6 +102,15 @@ const localData = ref({
   resultUrl: props.data.resultUrl || null,
   status: props.data.status || 'idle'
 })
+
+const defaultModel = computed(() => models.find(m => m.id === localData.value.model))
+const onModelChange = () => {
+  const model = models.find(m => m.id === localData.value.model)
+  if (model) {
+    localData.value.steps = model.steps
+  }
+  updateData()
+}
 
 watch(() => props.data, (newData) => {
   localData.value = { ...localData.value, ...newData }

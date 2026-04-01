@@ -12,7 +12,8 @@
         <a
           v-if="mediaUrl"
           :href="mediaUrl"
-          :download="downloadFilename"
+          target="_blank"
+          rel="noopener noreferrer"
           class="download-btn"
           @click.stop
         >
@@ -33,6 +34,7 @@
             loop
             class="media-player"
             @click.stop
+            @error="handleMediaError"
           />
           <img
             v-else-if="mediaUrl"
@@ -40,6 +42,7 @@
             :alt="generation.prompt"
             class="media-player"
             @click.stop
+            @error="handleMediaError"
           />
           <div v-else class="no-media">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -51,8 +54,15 @@
           </div>
         </div>
         
-        <div v-if="generation.prompt" class="prompt-bar">
-          <p>{{ generation.prompt }}</p>
+        <div v-if="generation.prompt" class="prompt-bar" :class="{ expanded: promptExpanded }">
+          <p class="prompt-text" :class="{ expanded: promptExpanded }">{{ generation.prompt }}</p>
+          <button 
+            v-if="isLongPrompt" 
+            class="prompt-toggle" 
+            @click.stop="togglePrompt"
+          >
+            {{ promptExpanded ? $t('common.showLess') : $t('common.showMore') }}
+          </button>
         </div>
       </div>
     </Transition>
@@ -70,12 +80,24 @@ export default {
     }
   },
   emits: ['close'],
+  data() {
+    return {
+      refreshing: false,
+      promptExpanded: false
+    }
+  },
   computed: {
     mediaUrl() {
+      // Prefer local_path if available (won't expire)
+      if (this.generation.local_path) {
+        return `/api/media/${this.generation.generation_type}/${this.generation.local_path.split('/').pop()}`
+      }
       return this.generation.remote_url || this.generation.thumbnail_url || null
     },
     isVideo() {
       return this.generation.generation_type === 'img2video' ||
+        this.generation.generation_type === 'txt2video' ||
+        this.generation.generation_type === 'audio2video' ||
         (this.generation.remote_url && 
          (this.generation.remote_url.endsWith('.mp4') || 
           this.generation.remote_url.endsWith('.webm')))
@@ -83,11 +105,45 @@ export default {
     downloadFilename() {
       const ext = this.isVideo ? '.mp4' : '.png'
       return `videlo-${this.generation.id}${ext}`
+    },
+    isLongPrompt() {
+      return this.generation.prompt && this.generation.prompt.length > 80
     }
   },
   watch: {
     visible(val) {
       document.body.style.overflow = val ? 'hidden' : ''
+      // Reset expanded state when modal closes
+      if (!val) {
+        this.promptExpanded = false
+      }
+    }
+  },
+  methods: {
+    togglePrompt() {
+      this.promptExpanded = !this.promptExpanded
+    },
+    async handleMediaError(e) {
+      // Try to refresh the URL if it's expired
+      if (this.generation.uuid && !this.refreshing) {
+        this.refreshing = true
+        try {
+          const response = await fetch(`/api/generations/${this.generation.id}/refresh-url`, {
+            method: 'POST'
+          })
+          if (response.ok) {
+            const data = await response.json()
+            if (data.remote_url) {
+              this.generation.remote_url = data.remote_url
+              e.target.src = data.remote_url
+            }
+          }
+        } catch (err) {
+          // Silently handle refresh errors
+        } finally {
+          this.refreshing = false
+        }
+      }
     }
   }
 }
@@ -205,13 +261,52 @@ export default {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
   border-radius: 12px;
+  transition: all 0.2s ease;
 }
 
-.prompt-bar p {
+.prompt-bar.expanded {
+  max-width: 90%;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.prompt-text {
   margin: 0;
   color: var(--text-primary);
   font-size: 0.875rem;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70vw;
+  cursor: pointer;
+}
+
+.prompt-text.expanded {
+  white-space: normal;
+  text-overflow: unset;
+  max-width: unset;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.prompt-toggle {
+  display: block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--accent-primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.prompt-toggle:hover {
+  background: var(--accent-primary);
+  color: #000;
+  border-color: var(--accent-primary);
 }
 
 .modal-enter-active,

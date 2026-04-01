@@ -29,6 +29,8 @@ from ..schemas import (
     AdCampaignListResponse,
     AdCampaignDetailResponse,
     AdAvatarData,
+    ScenePromptData,
+    StoryboardDetailData,
     ClarificationAnswersRequest,
     ClarificationQuestionsResponse,
     ScriptsGenerateRequest,
@@ -47,8 +49,10 @@ from ..services.ads_pipeline import (
     generate_video_prompts,
     generate_batch_output,
     apply_iteration,
-    get_pipeline_client
+    get_pipeline_client,
+    _add_debug_log
 )
+from ..services.nanobanana import get_nanobanana_client, NanoBananaModel, AspectRatio
 
 router = APIRouter(prefix="/api", tags=["ads"])
 
@@ -168,14 +172,15 @@ async def get_campaign_detail(
     campaign_id: int,
     db: Session = Depends(get_db)
 ):
-    """Get full campaign details with avatars and scripts."""
+    """Get full campaign details with avatars, scripts, storyboards, and scene assets."""
     campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    
+
     avatars = db.query(AdAvatar).filter(AdAvatar.campaign_id == campaign_id).all()
     scripts = db.query(AdScript).filter(AdScript.campaign_id == campaign_id).all()
-    
+    storyboards = db.query(AdStoryboard).filter(AdStoryboard.campaign_id == campaign_id).all()
+
     response = AdCampaignDetailResponse.from_orm(campaign)
     response.avatars = [AdAvatarData.from_orm(a) for a in avatars]
     response.scripts = [{
@@ -186,7 +191,34 @@ async def get_campaign_detail(
         "framework": s.framework,
         "scenes": s.scenes
     } for s in scripts]
-    
+    response.storyboards = []
+
+    for storyboard in storyboards:
+        scene_prompts = db.query(AdScenePrompt).filter(
+            AdScenePrompt.storyboard_id == storyboard.id
+        ).order_by(AdScenePrompt.scene_num.asc()).all()
+
+        response.storyboards.append(StoryboardDetailData(
+            id=storyboard.id,
+            script_id=storyboard.script_id,
+            scenes=storyboard.scenes or [],
+            scene_prompts=[
+                ScenePromptData(
+                    id=scene_prompt.id,
+                    scene_num=scene_prompt.scene_num,
+                    image_prompt=scene_prompt.image_prompt,
+                    video_prompt=scene_prompt.video_prompt,
+                    image_generation_id=scene_prompt.image_generation_id,
+                    video_generation_id=scene_prompt.video_generation_id,
+                    image_url=scene_prompt.image_url,
+                    video_url=scene_prompt.video_url,
+                    image_status=scene_prompt.image_status or "pending",
+                    video_status=scene_prompt.video_status or "pending"
+                )
+                for scene_prompt in scene_prompts
+            ]
+        ))
+
     return response
 
 
@@ -837,6 +869,25 @@ async def generate_all(
         if campaign.video_prompts_status != "completed":
             await generate_campaign_video_prompts(campaign_id, db)
             db.refresh(campaign)
+
+        # Phase 7.5: Generate scene images
+        if db.query(AdScenePrompt).join(AdStoryboard).filter(
+            AdStoryboard.campaign_id == campaign_id,
+            AdScenePrompt.image_prompt.isnot(None),
+            AdScenePrompt.image_status != "completed"
+        ).count() > 0:
+            await execute_image_generation(campaign_id, db)
+            db.refresh(campaign)
+
+        # Phase 8.5: Generate scene videos
+        if db.query(AdScenePrompt).join(AdStoryboard).filter(
+            AdStoryboard.campaign_id == campaign_id,
+            AdScenePrompt.video_prompt.isnot(None),
+            AdScenePrompt.image_status == "completed",
+            AdScenePrompt.video_status != "completed"
+        ).count() > 0:
+            await execute_video_generation(campaign_id, db)
+            db.refresh(campaign)
         
         # Phase 9: Batch output
         result = await get_batch_output(campaign_id, db)
@@ -1149,18 +1200,1158 @@ async def get_ad_campaign_legacy(
 
 
 # ==============================================================================
+
+
 # PHASE 7.5: EXECUTE IMAGE GENERATION
+
+
 # ==============================================================================
 
+
+
+
+
 @router.post("/ads/campaigns/{campaign_id}/generate-images")
+
+
 async def execute_image_generation(
+
+
+    campaign_id: int,
+
+
+    db: Session = Depends(get_db)
+
+
+):
+
+
+    """
+
+
+    Execute actual image generation for all scene prompts (Phase 7.5).
+
+
+
+
+
+    Uses Nano Banana 2 to generate or recreate the static ad images for each scene.
+
+
+    """
+
+
+    from ..models import Generation
+
+
+
+
+
+    campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
+
+
+    if not campaign:
+
+
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+
+
+
+
+    scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
+
+
+        AdStoryboard.campaign_id == campaign_id
+
+
+    ).order_by(AdScenePrompt.scene_num.asc()).all()
+
+
+
+
+
+    if not scene_prompts:
+
+
+        raise HTTPException(status_code=400, detail="No scene prompts found. Complete Phase 7 first.")
+
+
+
+
+
+    campaign.image_prompts_status = "processing"
+
+
+    campaign.phase_status = "processing"
+
+
+    db.commit()
+
+
+
+
+
+    nanobanana_client = get_nanobanana_client()
+
+
+    results = []
+
+
+    has_failure = False
+
+
+
+
+
+    for scene_prompt in scene_prompts:
+
+
+        if not scene_prompt.image_prompt or scene_prompt.image_status == "completed":
+
+
+            continue
+
+
+
+
+
+        _add_debug_log(campaign_id, "generate-images", "start", {
+
+
+            "scene_prompt_id": scene_prompt.id,
+
+
+            "scene_num": scene_prompt.scene_num,
+
+
+            "provider": "nanobanana",
+
+
+            "model": "nano-banana-2",
+
+
+            "num_requested": 3
+
+
+        })
+
+
+
+
+
+        try:
+
+
+            scene_prompt.image_status = "processing"
+
+
+            db.commit()
+
+
+
+
+
+            result = await nanobanana_client.generate_multiple_and_wait(
+
+
+                prompt=scene_prompt.image_prompt,
+
+
+                model=NanoBananaModel.NANO_BANANA_2,
+
+
+                aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+
+
+                reference_images=[scene_prompt.image_url] if scene_prompt.image_url else None,
+
+
+                num_images=3,
+
+
+                max_wait_seconds=120,
+
+
+                poll_interval=5
+
+
+            )
+
+
+
+
+
+            if not result.get("success") or not result.get("image_urls"):
+
+
+                raise RuntimeError(result.get("error") or "Nano Banana image generation failed")
+
+
+
+
+
+            image_url = result["image_urls"][0]
+
+
+            generation = Generation(
+
+
+                uuid=result.get("primary_task_id"),
+
+
+                prompt=scene_prompt.image_prompt,
+
+
+                model="nano-banana-2",
+
+
+                generation_type="text2img",
+
+
+                width=1280,
+
+
+                height=720,
+
+
+                status="completed",
+
+
+                progress=100,
+
+
+                remote_url=image_url,
+
+
+                completed_at=datetime.utcnow()
+
+
+            )
+
+
+            db.add(generation)
+
+
+            db.commit()
+
+
+            db.refresh(generation)
+
+
+
+
+
+            scene_prompt.image_generation_id = generation.id
+
+
+            scene_prompt.image_url = image_url
+
+
+            scene_prompt.image_status = "completed"
+
+
+            db.commit()
+
+
+
+
+
+            _add_debug_log(campaign_id, "generate-images", "complete", {
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+                "generation_id": generation.id,
+
+
+                "image_url": image_url,
+
+
+                "candidate_image_urls": result.get("image_urls", []),
+
+
+                "num_requested": result.get("num_requested", 3),
+
+
+                "num_succeeded": result.get("num_succeeded", 0),
+
+
+                "num_failed": result.get("num_failed", 0),
+
+
+                "errors": result.get("errors", [])
+
+
+            })
+
+
+
+
+
+            results.append({
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+                "image_generation_id": generation.id,
+
+
+                "image_url": image_url,
+
+
+                "image_urls": result.get("image_urls", []),
+
+
+                "num_requested": result.get("num_requested", 3),
+
+
+                "num_succeeded": result.get("num_succeeded", 0),
+
+
+                "num_failed": result.get("num_failed", 0),
+
+
+                "status": "completed"
+
+
+            })
+
+
+        except Exception as e:
+
+
+            has_failure = True
+
+
+            scene_prompt.image_status = "failed"
+
+
+            db.commit()
+
+
+            _add_debug_log(campaign_id, "generate-images", "error", {
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+                "error": str(e),
+
+
+                "num_requested": 3
+
+
+            })
+
+
+            results.append({
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+                "status": "failed",
+
+
+                "error": str(e),
+
+
+                "num_requested": 3
+
+
+            })
+
+
+
+
+
+    campaign.image_prompts_status = "failed" if has_failure else "completed"
+
+
+    campaign.phase_status = "failed" if has_failure else "completed"
+
+
+    if not has_failure:
+
+
+        campaign.current_phase = max(campaign.current_phase or 7, 8)
+
+
+    db.commit()
+
+
+
+
+
+    return {
+
+
+        "campaign_id": campaign_id,
+
+
+        "phase": "7.5",
+
+
+        "results": results
+
+
+    }
+
+
+
+
+
+
+
+
+# ==============================================================================
+
+
+# PHASE 8.5: EXECUTE VIDEO GENERATION
+
+
+# ==============================================================================
+
+
+
+
+
+@router.post("/ads/campaigns/{campaign_id}/generate-videos")
+
+
+
+
+
+async def execute_video_generation(
+
+
+
+
+
+    campaign_id: int,
+
+
+
+
+
+    db: Session = Depends(get_db)
+
+
+
+
+
+):
+
+
+
+
+
+    """
+
+
+
+
+
+    Execute actual video generation for all scene prompts (Phase 8.5).
+
+
+
+
+
+
+
+
+
+
+
+    Uses the LTX 2.3 image-to-video model to turn completed scene images into clips.
+
+
+
+
+
+    Stores request_ids for polling - frontend should poll /ads/campaigns/{id}/detail for updates.
+
+
+
+
+
+    """
+
+
+
+
+
+    from ..models import Generation
+
+
+
+
+
+
+
+
+
+
+
+    campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
+
+
+
+
+
+    if not campaign:
+
+
+
+
+
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+
+
+
+
+
+
+
+
+
+
+    scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
+
+
+
+
+
+        AdStoryboard.campaign_id == campaign_id,
+
+
+
+
+
+        AdScenePrompt.image_status == "completed",
+
+
+
+
+
+        AdScenePrompt.video_status != "completed"
+
+
+
+
+
+    ).order_by(AdScenePrompt.scene_num.asc()).all()
+
+
+
+
+
+
+
+
+
+
+
+    if not scene_prompts:
+
+
+
+
+
+        raise HTTPException(status_code=400, detail="No completed images found. Run Phase 7.5 first.")
+
+
+
+
+
+
+
+
+
+
+
+    campaign.video_prompts_status = "processing"
+
+
+
+
+
+    campaign.phase_status = "processing"
+
+
+
+
+
+    campaign.overall_status = "processing"
+
+
+
+
+
+    db.commit()
+
+
+
+
+
+
+
+
+
+
+
+    client = get_pipeline_client()
+
+
+
+
+
+    results = []
+
+
+
+
+
+
+
+
+
+
+
+    for scene_prompt in scene_prompts:
+
+
+
+
+
+        if not scene_prompt.video_prompt or not scene_prompt.image_url:
+
+
+
+
+
+            continue
+
+
+
+
+
+
+
+
+
+
+
+        _add_debug_log(campaign_id, "generate-videos", "start", {
+
+
+
+
+
+            "scene_prompt_id": scene_prompt.id,
+
+
+
+
+
+            "scene_num": scene_prompt.scene_num,
+
+
+
+
+
+            "provider": "deapi",
+
+
+
+
+
+            "model": "Ltx2_3_22B_Dist_INT8"
+
+
+
+
+
+        })
+
+
+
+
+
+
+
+
+
+
+
+        try:
+
+
+
+
+
+            scene_prompt.video_status = "processing"
+
+
+
+
+
+            db.commit()
+
+
+
+
+
+
+
+
+
+
+
+            # Submit and get request_id
+
+
+
+
+
+            result = await client.submit_img2video(
+
+
+
+
+
+                image_url=scene_prompt.image_url,
+
+
+
+
+
+                prompt=scene_prompt.video_prompt,
+
+
+
+
+
+                model="Ltx2_3_22B_Dist_INT8",
+
+
+
+
+
+                width=768,
+
+
+
+
+
+                height=768,
+
+
+
+
+
+                frames=120
+
+
+
+
+
+            )
+
+
+
+
+
+
+
+
+
+
+
+            request_id = result.get("request_id")
+
+
+
+
+
+            if not request_id:
+
+
+
+
+
+                raise RuntimeError("LTX 2.3 video generation did not return a request_id")
+
+
+
+
+
+
+
+
+
+
+
+            # Create generation record with request_id for polling
+
+
+
+
+
+            generation = Generation(
+
+
+
+
+
+                uuid=request_id,
+
+
+
+
+
+                prompt=scene_prompt.video_prompt,
+
+
+
+
+
+                model="Ltx2_3_22B_Dist_INT8",
+
+
+
+
+
+                generation_type="img2video",
+
+
+
+
+
+                width=768,
+
+
+
+
+
+                height=768,
+
+
+
+
+
+                frames=120,
+
+
+
+
+
+                fps=24,
+
+
+
+
+
+                status="processing",
+
+
+
+
+
+                progress=0
+
+
+
+
+
+            )
+
+
+
+
+
+            db.add(generation)
+
+
+
+
+
+            db.commit()
+
+
+
+
+
+            db.refresh(generation)
+
+
+
+
+
+
+
+
+
+
+
+            scene_prompt.video_generation_id = generation.id
+
+
+
+
+
+            db.commit()
+
+
+
+
+
+
+
+
+
+
+
+            _add_debug_log(campaign_id, "generate-videos", "submitted", {
+
+
+
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+
+
+
+                "generation_id": generation.id,
+
+
+
+
+
+                "request_id": request_id
+
+
+
+
+
+            })
+
+
+
+
+
+
+
+
+
+
+
+            results.append({
+
+
+
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+
+
+
+                "video_generation_id": generation.id,
+
+
+
+
+
+                "request_id": request_id,
+
+
+
+
+
+                "status": "processing"
+
+
+
+
+
+            })
+
+
+
+
+
+        except Exception as e:
+
+
+
+
+
+            scene_prompt.video_status = "failed"
+
+
+
+
+
+            db.commit()
+
+
+
+
+
+            _add_debug_log(campaign_id, "generate-videos", "error", {
+
+
+
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+
+
+
+                "error": str(e)
+
+
+
+
+
+            })
+
+
+
+
+
+            results.append({
+
+
+
+
+
+                "scene_prompt_id": scene_prompt.id,
+
+
+
+
+
+                "scene_num": scene_prompt.scene_num,
+
+
+
+
+
+                "status": "failed",
+
+
+
+
+
+                "error": str(e)
+
+
+
+
+
+            })
+
+
+
+
+
+
+
+
+
+
+
+    return {
+
+
+
+
+
+        "campaign_id": campaign_id,
+
+
+
+
+
+        "phase": "8.5",
+
+
+
+
+
+        "message": "Video generation started. Poll /api/ads/campaigns/{campaign_id}/detail for status updates.",
+
+
+
+
+
+        "results": results
+
+
+
+
+
+    }
+
+
+# ==============================================================================
+# STATUS POLLING ENDPOINT
+# ==============================================================================
+
+@router.get("/ads/campaigns/{campaign_id}/check-status")
+async def check_campaign_status(
     campaign_id: int,
     db: Session = Depends(get_db)
 ):
     """
-    Execute actual image generation for all scene prompts (Phase 7.5).
+    Check and update status of all processing scene generations.
     
-    Uses deAPI to generate images from the prompts created in Phase 7.
+    This endpoint polls deAPI for all scene prompts that are in 'processing' state
+    and updates their status, URLs, and progress.
+    
+    Frontend should poll this endpoint every 5-10 seconds during generation.
     """
     from ..models import Generation
     
@@ -1168,142 +2359,353 @@ async def execute_image_generation(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     
+    # Get all scene prompts with processing image or video
     scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
         AdStoryboard.campaign_id == campaign_id
     ).all()
     
-    if not scene_prompts:
-        raise HTTPException(status_code=400, detail="No scene prompts found. Complete Phase 7 first.")
-    
-    campaign.image_prompts_status = "processing"
-    db.commit()
-    
     client = get_pipeline_client()
-    results = []
+    deapi_client = get_deapi_client()
+    updates = []
     
     for scene_prompt in scene_prompts:
-        if scene_prompt.image_prompt and scene_prompt.image_status == "pending":
-            try:
-                result = await client.submit_text2img(scene_prompt.image_prompt)
-                
-                generation = Generation(
-                    prompt=scene_prompt.image_prompt,
-                    generation_type="text2img",
-                    model="ZImageTurbo_INT8",
-                    status="completed",
-                    remote_url=result.get("url") or result.get("image_url")
-                )
-                db.add(generation)
-                db.commit()
-                db.refresh(generation)
-                
-                scene_prompt.image_generation_id = generation.id
-                scene_prompt.image_url = generation.remote_url
-                scene_prompt.image_status = "completed"
-                db.commit()
-                
-                results.append({
-                    "scene_num": scene_prompt.scene_num,
-                    "image_url": scene_prompt.image_url,
-                    "status": "completed"
-                })
-            except Exception as e:
-                scene_prompt.image_status = "failed"
-                db.commit()
-                results.append({
-                    "scene_num": scene_prompt.scene_num,
-                    "status": "failed",
-                    "error": str(e)
-                })
+        # Check image generation status
+        if scene_prompt.image_status == "processing" and scene_prompt.image_generation_id:
+            generation = db.query(Generation).filter(
+                Generation.id == scene_prompt.image_generation_id
+            ).first()
+            
+            if generation and generation.uuid and generation.status == "processing":
+                try:
+                    status = await deapi_client.get_request_status(generation.uuid)
+                    data = status.get("data", status)
+                    
+                    if data.get("status") == "done":
+                        image_url = data.get("result_url") or data.get("download_url")
+                        if image_url:
+                            generation.remote_url = image_url
+                            generation.status = "completed"
+                            generation.progress = 100
+                            generation.completed_at = datetime.utcnow()
+                            scene_prompt.image_url = image_url
+                            scene_prompt.image_status = "completed"
+                            db.commit()
+                            updates.append({
+                                "scene_num": scene_prompt.scene_num,
+                                "type": "image",
+                                "status": "completed",
+                                "url": image_url
+                            })
+                    elif data.get("status") == "error":
+                        generation.status = "failed"
+                        scene_prompt.image_status = "failed"
+                        db.commit()
+                        updates.append({
+                            "scene_num": scene_prompt.scene_num,
+                            "type": "image",
+                            "status": "failed",
+                            "error": data.get("error", "Image generation failed")
+                        })
+                    elif "progress" in data:
+                        generation.progress = data.get("progress", 0)
+                        db.commit()
+                except Exception as e:
+                    _add_debug_log(campaign_id, "check-status", "error", {
+                        "scene_num": scene_prompt.scene_num,
+                        "type": "image",
+                        "error": str(e)
+                    })
+        
+        # Check video generation status
+        if scene_prompt.video_status == "processing" and scene_prompt.video_generation_id:
+            generation = db.query(Generation).filter(
+                Generation.id == scene_prompt.video_generation_id
+            ).first()
+            
+            if generation and generation.uuid and generation.status == "processing":
+                try:
+                    status = await deapi_client.get_request_status(generation.uuid)
+                    data = status.get("data", status)
+                    
+                    if data.get("status") == "done":
+                        video_url = data.get("result_url") or data.get("download_url")
+                        if video_url:
+                            generation.remote_url = video_url
+                            generation.status = "completed"
+                            generation.progress = 100
+                            generation.completed_at = datetime.utcnow()
+                            scene_prompt.video_url = video_url
+                            scene_prompt.video_status = "completed"
+                            db.commit()
+                            updates.append({
+                                "scene_num": scene_prompt.scene_num,
+                                "type": "video",
+                                "status": "completed",
+                                "url": video_url
+                            })
+                    elif data.get("status") == "error":
+                        generation.status = "failed"
+                        scene_prompt.video_status = "failed"
+                        db.commit()
+                        updates.append({
+                            "scene_num": scene_prompt.scene_num,
+                            "type": "video",
+                            "status": "failed",
+                            "error": data.get("error", "Video generation failed")
+                        })
+                    elif "progress" in data:
+                        generation.progress = data.get("progress", 0)
+                        db.commit()
+                except Exception as e:
+                    _add_debug_log(campaign_id, "check-status", "error", {
+                        "scene_num": scene_prompt.scene_num,
+                        "type": "video",
+                        "error": str(e)
+                    })
     
-    campaign.image_prompts_status = "completed"
-    db.commit()
+    # Update campaign overall status if all scenes are done
+    all_scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
+        AdStoryboard.campaign_id == campaign_id
+    ).all()
+    
+    all_videos_done = all(
+        sp.video_status in ("completed", "failed") or not sp.video_prompt
+        for sp in all_scene_prompts
+    )
+    
+    if all_videos_done and campaign.overall_status == "processing":
+        campaign.overall_status = "completed"
+        campaign.completed_at = datetime.utcnow()
+        db.commit()
+    
+    db.refresh(campaign)
     
     return {
         "campaign_id": campaign_id,
-        "phase": "7.5",
-        "results": results
+        "overall_status": campaign.overall_status,
+        "updates": updates
     }
 
 
-# ==============================================================================
-# PHASE 8.5: EXECUTE VIDEO GENERATION
-# ==============================================================================
-
-@router.post("/ads/campaigns/{campaign_id}/generate-videos")
-async def execute_video_generation(
+@router.post("/ads/campaigns/{campaign_id}/scenes/{scene_prompt_id}/regenerate-image")
+async def regenerate_scene_image(
     campaign_id: int,
+    scene_prompt_id: int,
+    prompt: str,
     db: Session = Depends(get_db)
 ):
-    """
-    Execute actual video generation for all scene prompts (Phase 8.5).
-    
-    Uses deAPI to generate videos from the images and prompts.
-    """
+    """Regenerate a single campaign scene image using Nano Banana 2."""
     from ..models import Generation
-    
+
     campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
+
+    scene_prompt = db.query(AdScenePrompt).join(AdStoryboard).filter(
+        AdScenePrompt.id == scene_prompt_id,
+        AdStoryboard.id == AdScenePrompt.storyboard_id,
+        AdStoryboard.campaign_id == campaign_id
+    ).first()
+    if not scene_prompt:
+        raise HTTPException(status_code=404, detail="Scene prompt not found")
+
+    previous_image_url = scene_prompt.image_url
+    scene_prompt.image_prompt = prompt
+    scene_prompt.image_status = "processing"
+    scene_prompt.video_status = "pending"
+    scene_prompt.video_generation_id = None
+    scene_prompt.video_url = None
+    campaign.image_prompts_status = "processing"
+    campaign.video_prompts_status = "pending"
+    campaign.phase_status = "processing"
+    campaign.overall_status = "processing"
+    db.commit()
+
+    _add_debug_log(campaign_id, "scene-regenerate-image", "start", {
+        "scene_prompt_id": scene_prompt.id,
+        "scene_num": scene_prompt.scene_num,
+        "model": "nano-banana-2",
+        "num_requested": 3
+    })
+
+    try:
+        result = await get_nanobanana_client().generate_multiple_and_wait(
+            prompt=prompt,
+            model=NanoBananaModel.NANO_BANANA_2,
+            aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+            reference_images=[previous_image_url] if previous_image_url else None,
+            num_images=3,
+            max_wait_seconds=120,
+            poll_interval=5
+        )
+
+        if not result.get("success") or not result.get("image_urls"):
+            raise RuntimeError(result.get("error") or "Nano Banana image regeneration failed")
+
+        image_url = result["image_urls"][0]
+        generation = Generation(
+            uuid=result.get("primary_task_id"),
+            prompt=prompt,
+            model="nano-banana-2",
+            generation_type="text2img",
+            width=1280,
+            height=720,
+            status="completed",
+            progress=100,
+            remote_url=image_url,
+            completed_at=datetime.utcnow()
+        )
+        db.add(generation)
+        db.commit()
+        db.refresh(generation)
+
+        scene_prompt.image_generation_id = generation.id
+        scene_prompt.image_url = image_url
+        scene_prompt.image_status = "completed"
+        campaign.image_prompts_status = "completed"
+        campaign.phase_status = "completed"
+        db.commit()
+
+        _add_debug_log(campaign_id, "scene-regenerate-image", "complete", {
+            "scene_prompt_id": scene_prompt.id,
+            "scene_num": scene_prompt.scene_num,
+            "generation_id": generation.id,
+            "image_url": image_url,
+            "candidate_image_urls": result.get("image_urls", []),
+            "num_requested": result.get("num_requested", 3),
+            "num_succeeded": result.get("num_succeeded", 0),
+            "num_failed": result.get("num_failed", 0),
+            "errors": result.get("errors", [])
+        })
+
+        return {
+            "campaign_id": campaign_id,
+            "scene_prompt_id": scene_prompt.id,
+            "image_generation_id": generation.id,
+            "image_url": image_url,
+            "image_urls": result.get("image_urls", []),
+            "num_requested": result.get("num_requested", 3),
+            "num_succeeded": result.get("num_succeeded", 0),
+            "num_failed": result.get("num_failed", 0),
+            "status": "completed"
+        }
+    except Exception as e:
+        scene_prompt.image_status = "failed"
+        campaign.image_prompts_status = "failed"
+        campaign.phase_status = "failed"
+        db.commit()
+        _add_debug_log(campaign_id, "scene-regenerate-image", "error", {
+            "scene_prompt_id": scene_prompt.id,
+            "scene_num": scene_prompt.scene_num,
+            "error": str(e)
+        })
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ads/campaigns/{campaign_id}/scenes/{scene_prompt_id}/regenerate-video")
+async def regenerate_scene_video(
+    campaign_id: int,
+    scene_prompt_id: int,
+    prompt: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Regenerate a single campaign scene video clip using LTX 2.3.
     
-    scene_prompts = db.query(AdScenePrompt).join(AdStoryboard).filter(
-        AdStoryboard.campaign_id == campaign_id,
-        AdScenePrompt.image_status == "completed"
-    ).all()
-    
-    if not scene_prompts:
-        raise HTTPException(status_code=400, detail="No completed images found. Run Phase 7.5 first.")
-    
+    Returns immediately with request_id - poll /ads/campaigns/{campaign_id}/check-status for updates.
+    """
+    from ..models import Generation
+
+    campaign = db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    scene_prompt = db.query(AdScenePrompt).join(AdStoryboard).filter(
+        AdScenePrompt.id == scene_prompt_id,
+        AdStoryboard.id == AdScenePrompt.storyboard_id,
+        AdStoryboard.campaign_id == campaign_id
+    ).first()
+    if not scene_prompt:
+        raise HTTPException(status_code=404, detail="Scene prompt not found")
+    if not scene_prompt.image_url:
+        raise HTTPException(status_code=400, detail="Scene image is required before regenerating video")
+
+    if prompt:
+        scene_prompt.video_prompt = prompt
+
+    if not scene_prompt.video_prompt:
+        raise HTTPException(status_code=400, detail="Video prompt is required")
+
+    scene_prompt.video_status = "processing"
+    scene_prompt.video_url = None  # Clear previous URL
     campaign.video_prompts_status = "processing"
+    campaign.phase_status = "processing"
+    campaign.overall_status = "processing"
     db.commit()
-    
-    client = get_pipeline_client()
-    results = []
-    
-    for scene_prompt in scene_prompts:
-        if scene_prompt.video_prompt and scene_prompt.image_url and scene_prompt.video_status == "pending":
-            try:
-                result = await client.submit_img2video(
-                    image_url=scene_prompt.image_url,
-                    prompt=scene_prompt.video_prompt
-                )
-                
-                generation = Generation(
-                    prompt=scene_prompt.video_prompt,
-                    generation_type="img2video",
-                    model="Ltx2_19B_Dist_FP8",
-                    status="completed",
-                    remote_url=result.get("url") or result.get("video_url")
-                )
-                db.add(generation)
-                db.commit()
-                db.refresh(generation)
-                
-                scene_prompt.video_generation_id = generation.id
-                scene_prompt.video_url = generation.remote_url
-                scene_prompt.video_status = "completed"
-                db.commit()
-                
-                results.append({
-                    "scene_num": scene_prompt.scene_num,
-                    "video_url": scene_prompt.video_url,
-                    "status": "completed"
-                })
-            except Exception as e:
-                scene_prompt.video_status = "failed"
-                db.commit()
-                results.append({
-                    "scene_num": scene_prompt.scene_num,
-                    "status": "failed",
-                    "error": str(e)
-                })
-    
-    campaign.video_prompts_status = "completed"
-    campaign.overall_status = "completed"
-    db.commit()
-    
-    return {
-        "campaign_id": campaign_id,
-        "phase": "8.5",
-        "results": results
-    }
+
+    _add_debug_log(campaign_id, "scene-regenerate-video", "start", {
+        "scene_prompt_id": scene_prompt.id,
+        "scene_num": scene_prompt.scene_num,
+        "model": "Ltx2_3_22B_Dist_INT8"
+    })
+
+    try:
+        result = await get_pipeline_client().submit_img2video(
+            image_url=scene_prompt.image_url,
+            prompt=scene_prompt.video_prompt,
+            model="Ltx2_3_22B_Dist_INT8",
+            width=768,
+            height=768,
+            frames=120
+        )
+
+        request_id = result.get("request_id")
+        if not request_id:
+            raise RuntimeError("LTX 2.3 video regeneration did not return a request_id")
+
+        # Create generation record with processing status
+        generation = Generation(
+            uuid=request_id,
+            prompt=scene_prompt.video_prompt,
+            model="Ltx2_3_22B_Dist_INT8",
+            generation_type="img2video",
+            width=768,
+            height=768,
+            frames=120,
+            fps=24,
+            status="processing",
+            progress=0
+        )
+        db.add(generation)
+        db.commit()
+        db.refresh(generation)
+
+        scene_prompt.video_generation_id = generation.id
+        db.commit()
+
+        _add_debug_log(campaign_id, "scene-regenerate-video", "submitted", {
+            "scene_prompt_id": scene_prompt.id,
+            "scene_num": scene_prompt.scene_num,
+            "generation_id": generation.id,
+            "request_id": request_id
+        })
+
+        return {
+            "campaign_id": campaign_id,
+            "scene_prompt_id": scene_prompt.id,
+            "video_generation_id": generation.id,
+            "request_id": request_id,
+            "status": "processing",
+            "message": "Video generation started. Poll /api/ads/campaigns/{campaign_id}/check-status for updates."
+        }
+    except Exception as e:
+        scene_prompt.video_status = "failed"
+        campaign.video_prompts_status = "failed"
+        campaign.phase_status = "failed"
+        db.commit()
+        _add_debug_log(campaign_id, "scene-regenerate-video", "error", {
+            "scene_prompt_id": scene_prompt.id,
+            "scene_num": scene_prompt.scene_num,
+            "error": str(e)
+        })
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -32,6 +32,8 @@ Videlo is a modern web application that leverages AI to transform text descripti
 | **Image-to-Video** | Transform static images into dynamic video content |
 | **Image Edit** | AI-powered image editing and style transfer with Qwen Image Edit |
 | **AI Ads Generator** | Complete ad campaign pipeline with automated script, image, and video generation |
+| **AI Avatar** | 3-step pipeline for creating talking AI avatars: portrait, voice, and animation |
+| **UGC Ads Creator** | Generate realistic influencer-style video ads with AI-generated scripts and scenes |
 | **Multi-language** | English and Chinese language support with easy switching |
 | **Real-time Progress** | Live progress tracking with visual indicators |
 | **Prompt Enhancement** | AI-powered prompt improvement for better results |
@@ -70,17 +72,22 @@ Videlo/
 ├── backend/
 │   ├── app/
 │   │   ├── routes/
-│ │ │ ├── generations.py # Generation endpoints (text2img, txt2video, img2video, img2img)
-│ │ │ ├── prompts.py # Prompt enhancement
-│ │ │ ├── ads.py # AI Ads Generator pipeline
-│ │ │ └── workflow.py # Workflow canvas execution
-│ │ ├── services/
-│ │ │ ├── deapi.py # deAPI client
-│ │ │ ├── iflow.py # iFlow API client
-│ │ │ ├── nanobanana.py # Nanobanana API client
-│ │ │ └── ads_pipeline.py # Ads generation pipeline
+│   │   │   ├── generations.py    # Generation endpoints (text2img, txt2video, img2video, img2img)
+│   │   │   ├── prompts.py        # Prompt enhancement
+│   │   │   ├── ads.py            # AI Ads Generator pipeline
+│   │   │   ├── avatar.py         # AI Avatar creator endpoints
+│   │   │   ├── ugc_ads.py        # UGC Ads Creator endpoints
+│   │   │   └── workflow.py       # Workflow canvas execution
+│   │   ├── services/
+│   │   │   ├── deapi.py          # deAPI client
+│   │   │   ├── iflow.py          # iFlow API client
+│   │   │   ├── nanobanana.py     # Nanobanana API client
+│   │   │   ├── ads_pipeline.py   # Ads generation pipeline
+│   │   │   ├── prompt_matcher.py # Prompt matching service
+│   │   │   └── ugc_story_generator.py # UGC story generation
 │   │   ├── utils/
-│   │   │   └── security.py       # Security utilities
+│   │   │   ├── security.py       # Security utilities
+│   │   │   └── media.py          # Media utilities
 │   │   ├── config.py             # App configuration
 │   │   ├── database.py           # Database setup
 │   │   ├── main.py               # FastAPI application
@@ -108,20 +115,22 @@ Videlo/
 │   │   │       ├── ImageToVideoNode.vue
 │   │   │       ├── VideoGenNode.vue
 │   │   │       ├── VideoToTextNode.vue
-│ │ │ ├── TextToSpeechNode.vue
+│   │   │       ├── VideoReplaceNode.vue
+│   │   │       ├── TextToSpeechNode.vue
 │ │ │ ├── StickyNoteNode.vue
 │ │ │ ├── AIAssistantNode.vue
 │ │ │ ├── ImagePromptEnhancerNode.vue
 │ │ │ ├── VideoPromptEnhancerNode.vue
 │ │ │ └── OutputNode.vue
-│ │ ├── views/
-│ │ │ ├── Home.vue # Main generation view
-│ │ │ ├── ImageEdit.vue # Image editing page
-│ │ │ ├── AdGenerator.vue # AI Ads Generator
-│ │ │ ├── AdsImgGen.vue # Ads Image Generator
-│ │ │ ├── ImgGen.vue # Image Generator
-│ │ │ ├── PromptsGallery.vue # Prompts gallery view
-│ │ │ └── Workflow.vue # Workflow canvas page
+│   │   ├── views/
+│   │   │   ├── Home.vue          # Main generation view
+│   │   │   ├── ImageEdit.vue     # Image editing page
+│   │   │   ├── AdGenerator.vue   # AI Ads Generator
+│   │   │   ├── ImgGen.vue        # Image Generator
+│   │   │   ├── PromptsGallery.vue# Prompts gallery view
+│   │   │   ├── Workflow.vue      # Workflow canvas page
+│   │   │   ├── AiAvatar.vue      # AI Avatar creator
+│   │   │   └── UgcAdsCreator.vue # UGC Ads Creator
 │   │   ├── services/
 │   │   │   └── api.js            # API client
 │   │   ├── i18n/                 # Internationalization
@@ -219,6 +228,31 @@ Access the application at `http://localhost:3000`
 | `GET` | `/api/ads/{id}/status` | Poll campaign status |
 | `POST` | `/api/ads/{id}/redo` | Redo a specific step |
 
+### AI Avatar Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/avatar` | Create new avatar project |
+| `GET` | `/api/avatar` | List avatar projects |
+| `GET` | `/api/avatar/{id}` | Get project details |
+| `GET` | `/api/avatar/{id}/status` | Poll generation status |
+| `POST` | `/api/avatar/{id}/generate` | Start generation for step(s) |
+| `POST` | `/api/avatar/{id}/regenerate` | Regenerate with modified params |
+| `DELETE` | `/api/avatar/{id}` | Delete project |
+
+### UGC Ads Creator Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/ugc-ads/prompts/search` | Search prompt library |
+| `GET` | `/api/ugc-ads/prompts/{id}` | Get specific prompt |
+| `POST` | `/api/ugc-ads/stories` | Create new UGC story |
+| `GET` | `/api/ugc-ads/stories` | List stories |
+| `GET` | `/api/ugc-ads/stories/{id}` | Get story with scenes/shots |
+| `POST` | `/api/ugc-ads/stories/{id}/generate` | Generate images/videos for shots |
+| `POST` | `/api/ugc-ads/stories/{id}/shots/regenerate` | Regenerate specific shot |
+| `DELETE` | `/api/ugc-ads/stories/{id}` | Delete story |
+
 ### Workflow Endpoints
 
 | Method | Endpoint | Description |
@@ -247,10 +281,11 @@ Interactive API documentation: `http://localhost:8000/docs`
 | `/txt2video` | Text to Video generation |
 | `/img2video` | Image to Video generation |
 | `/ads` | AI Ads Generator |
-| `/ads-img-gen` | Ads Image Generator |
 | `/img-gen` | Image Generator |
 | `/prompts-gallery` | Browse prompts gallery |
 | `/workflow` | Visual workflow canvas with node-based editor |
+| `/ai-avatar` | AI Avatar creator (3-step pipeline) |
+| `/ugc-ads` | UGC Ads Creator |
 | `/gallery` | Browse all generations |
 
 ---
@@ -297,6 +332,7 @@ The Workflow Canvas is a visual node-based editor for creating complex AI pipeli
 | **Image to Video** | Image | Video | Animate static images |
 | **Video Gen** | Text | Video | Generate videos from text |
 | **Video to Text** | Video | Text | Extract text/transcribe video |
+| **Video Replace** | Video + Image | Video | Replace faces in videos |
 | **Text to Speech** | Text | Audio | Convert text to audio |
 | **Sticky Note** | - | - | Add notes and annotations |
 | **AI Assistant** | Text | Text | AI-powered text assistance |
@@ -400,6 +436,51 @@ The AI Ads Generator automates the entire ad creation process:
 5. **QA Review** - Automated quality assessment with recommendations
 
 Each step can be redone with feedback for iterative refinement.
+
+---
+
+## AI Avatar Creator
+
+Create talking AI avatars with a 3-step pipeline:
+
+### Step 1: Generate Portrait
+- Text-to-image generation using FLUX-2 Klein
+- Customizable model, width, and height
+- Multiple style options for different avatar looks
+
+### Step 2: Generate Voice
+- Text-to-speech using Kokoro or Chatterbox models
+- Multiple voice options and languages
+- Adjustable speed settings
+
+### Step 3: Animate
+- Audio-to-video animation using LTX-2.3
+- Syncs lip movement with generated audio
+- Natural head movement and expressions
+
+Each step can be regenerated independently with modified parameters.
+
+---
+
+## UGC Ads Creator
+
+Generate realistic influencer-style video ads:
+
+### Features
+- **Prompt Library** - Search and match from marketing prompt library
+- **Story Generation** - AI generates complete ad scripts with scenes and shots
+- **Character Setup** - Define influencer character details
+- **Asset Generation** - Automatic image and video generation for each shot
+- **Shot Management** - Regenerate individual shots with custom prompts
+
+### Pipeline
+1. Enter product info and character details
+2. AI generates story with scenes and shots
+3. Review and edit the generated script
+4. Generate images and videos for all shots
+5. Regenerate individual shots as needed
+
+Supported aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4, 4:5, 5:4
 
 ---
 

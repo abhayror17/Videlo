@@ -18,6 +18,75 @@ router = APIRouter(prefix="/api/workflow", tags=["workflow"])
 executions: Dict[str, dict] = {}
 
 
+async def smart_poll_for_result(
+    api_client,
+    request_id: str,
+    node_type: str = "default",
+    max_polls: int = 20,
+    min_delay: int = 10,
+    max_delay: int = 30
+) -> dict:
+    """
+    Smart polling with exponential backoff to minimize API requests.
+    
+    Args:
+        api_client: DeAPI client instance
+        request_id: The request ID to poll
+        node_type: Type of node (for logging)
+        max_polls: Maximum number of poll attempts (default 20)
+        min_delay: Starting delay in seconds (default 10)
+        max_delay: Maximum delay in seconds (default 30)
+    
+    Returns:
+        dict with 'status', 'result_url', 'result', 'error', 'polls_used'
+    
+    Polling strategy:
+    - Starts at min_delay (10s)
+    - Increases by 2s each poll until max_delay (30s)
+    - Maximum 20 polls over ~8 minutes (vs 120-300 polls before)
+    - Stops immediately on completion/error
+    """
+    for poll_count in range(max_polls):
+        # Exponential backoff with cap
+        delay = min(min_delay + (poll_count * 2), max_delay)
+        await asyncio.sleep(delay)
+        
+        try:
+            resp = await api_client.get_request_status(request_id)
+            status_data = resp.get("data", {})
+            api_status = status_data.get("status")
+            
+            if api_status == "done":
+                print(f"[Workflow] {node_type} completed after {poll_count + 1} polls")
+                return {
+                    "status": "completed",
+                    "result_url": status_data.get("result_url"),
+                    "result": status_data.get("result"),
+                    "polls_used": poll_count + 1
+                }
+            elif api_status == "error":
+                error_msg = status_data.get("error", "Generation failed")
+                print(f"[Workflow] {node_type} failed after {poll_count + 1} polls: {error_msg}")
+                return {
+                    "status": "failed",
+                    "error": error_msg,
+                    "polls_used": poll_count + 1
+                }
+            # Continue polling for "processing" or "pending"
+            
+        except Exception as e:
+            print(f"[Workflow] {node_type} poll error: {e}")
+            # Don't fail on single poll error, continue trying
+    
+    # Exhausted all polls
+    print(f"[Workflow] {node_type} timed out after {max_polls} polls")
+    return {
+        "status": "failed",
+        "error": "Generation timed out",
+        "polls_used": max_polls
+    }
+
+
 class NodeData(BaseModel):
     id: str
     type: str
@@ -62,6 +131,16 @@ async def execute_graph_task(execution_id: str, graph_data: GraphPayload, custom
         
         for edge in graph_data.edges:
             G.add_edge(edge.source, edge.target)
+        
+        # Build edge handle lookup: target_id -> {source_id: {sourceHandle, targetHandle}}
+        edge_handles: Dict[str, Dict[str, dict]] = {}
+        for edge in graph_data.edges:
+            if edge.target not in edge_handles:
+                edge_handles[edge.target] = {}
+            edge_handles[edge.target][edge.source] = {
+                "sourceHandle": edge.sourceHandle,
+                "targetHandle": edge.targetHandle
+            }
         
         # Check for cycles
         if not nx.is_directed_acyclic_graph(G):
@@ -203,16 +282,8 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
                 
                 request_id = gen_result.get("data", {}).get("request_id") or gen_result.get("request_id")
                 if request_id:
-                    max_attempts = 120
-                    for attempt in range(max_attempts):
-                        resp = await api.get_request_status(request_id)
-                        status_data = resp.get("data", {})
-                        api_status = status_data.get("status")
-                        if api_status == "done":
-                            return status_data.get("result_url")
-                        elif api_status == "error":
-                            return None
-                        await asyncio.sleep(2)
+                    poll_result = await smart_poll_for_result(api, request_id, "imageGen", max_polls=15, min_delay=8)
+                    return poll_result.get("result_url")
                 return None
             
             # Run batch generation in parallel
@@ -246,39 +317,31 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
         if prompt:
             result["status"] = "processing"
             
+            # LTX-2.3: min frames=49, max=241, no steps/guidance
+            frames = max(49, data.get("frames", 97))
+            width = max(512, data.get("width", 768))
+            height = max(512, data.get("height", 432))
+            
             gen_result = await api.generate_txt2video(
                 prompt=prompt,
                 model=data.get("model", "Ltx2_3_22B_Dist_INT8"),
-                width=data.get("width", 512),
-                height=data.get("height", 512),
-                frames=data.get("frames", 48),
-                fps=data.get("fps", 24),
-                steps=data.get("steps", 20),
-                guidance=data.get("guidance", 3.5),
+                width=width,
+                height=height,
+                frames=frames,
+                fps=24,
                 seed=data.get("seed", -1)
             )
             
             request_id = gen_result.get("data", {}).get("request_id") or gen_result.get("request_id")
             print(f"[Workflow] videoGen request_id: {request_id}")
             if request_id:
-                max_attempts = 180  # Videos take longer
-                for attempt in range(max_attempts):
-                    resp = await api.get_request_status(request_id)
-                    status_data = resp.get("data", {})
-                    api_status = status_data.get("status")
-                    if attempt % 10 == 0:
-                        print(f"[Workflow] videoGen polling attempt {attempt}: status={api_status}")
-                    if api_status == "done":
-                        result["resultUrl"] = status_data.get("result_url")
-                        result["status"] = "completed"
-                        print(f"[Workflow] videoGen completed: {result['resultUrl']}")
-                        break
-                    elif api_status == "error":
-                        result["status"] = "failed"
-                        result["error"] = status_data.get("error", "Generation failed")
-                        print(f"[Workflow] videoGen failed: {result['error']}")
-                        break
-                    await asyncio.sleep(3)
+                poll_result = await smart_poll_for_result(api, request_id, "videoGen", max_polls=25, min_delay=15)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "Video generation failed")
     
     elif node_type == "imageEdit":
         # Image editing - requires downloading the image first
@@ -326,105 +389,191 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
             
             request_id = gen_result.get("data", {}).get("request_id") or gen_result.get("request_id")
             if request_id:
-                max_attempts = 120
-                for _ in range(max_attempts):
-                    resp = await api.get_request_status(request_id)
-                    status_data = resp.get("data", {})
-                    api_status = status_data.get("status")
-                    if api_status == "done":
-                        result["resultUrl"] = status_data.get("result_url")
-                        result["status"] = "completed"
-                        break
-                    elif api_status == "error":
-                        result["status"] = "failed"
-                        result["error"] = status_data.get("error", "Edit failed")
-                        break
-                    await asyncio.sleep(2)
+                poll_result = await smart_poll_for_result(api, request_id, "imageEdit", max_polls=15, min_delay=10)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "Edit failed")
     
     elif node_type == "img2video":
         # Image-to-Video generation
         prompt = data.get("prompt", "")
         image_data = None
+        last_frame_data = None  # Optional end frame for LTX-2.3
         
         print(f"[Workflow] img2video - incoming_edges: {incoming_edges}")
         for parent_id in incoming_edges:
             parent_output = node_outputs.get(parent_id, {})
+            # Get the target handle for this edge
+            edge_info = edge_handles.get(node.id, {}).get(parent_id, {})
+            target_handle = edge_info.get("targetHandle")
+            print(f"[Workflow] img2video - parent {parent_id} targetHandle: {target_handle}")
             print(f"[Workflow] img2video - parent {parent_id} output keys: {list(parent_output.keys())}")
             print(f"[Workflow] img2video - parent imageData present: {bool(parent_output.get('imageData'))}")
             print(f"[Workflow] img2video - parent resultUrl present: {bool(parent_output.get('resultUrl'))}")
             
-            # Check if we have direct image data (from imageInput node)
-            if parent_output.get("imageData"):
-                img_data_url = parent_output["imageData"]
-                print(f"[Workflow] img2video - imageData type: {type(img_data_url)}, starts with data: {str(img_data_url).startswith('data:')}")
-                # Extract base64 from data URL
-                if img_data_url.startswith("data:") and ";base64," in img_data_url:
-                    import base64
-                    base64_data = img_data_url.split(";base64,")[1]
-                    image_data = base64.b64decode(base64_data)
-                    print(f"[Workflow] img2video - decoded base64, length: {len(image_data)}")
-                else:
-                    # Raw base64 without prefix
-                    import base64
-                    image_data = base64.b64decode(img_data_url)
-                    print(f"[Workflow] img2video - decoded raw base64, length: {len(image_data)}")
-            elif parent_output.get("resultUrl"):
-                result_url = parent_output["resultUrl"]
-                print(f"[Workflow] img2video - resultUrl type: {type(result_url)}, starts with data: {str(result_url).startswith('data:')}")
-                # Check if it's a data URL
-                if result_url.startswith("data:") and ";base64," in result_url:
-                    import base64
-                    base64_data = result_url.split(";base64,")[1]
-                    image_data = base64.b64decode(base64_data)
-                    print(f"[Workflow] img2video - decoded from resultUrl, length: {len(image_data)}")
-                else:
-                    # Download the image from URL
-                    print(f"[Workflow] img2video - downloading from URL: {result_url[:100]}...")
+            # Determine if this is for start frame or end frame based on targetHandle
+            is_end_frame = target_handle == "end-frame"
+            
+            # Helper to extract image data
+            def extract_image_data(output):
+                if output.get("imageData"):
+                    img_data_url = output["imageData"]
+                    if img_data_url.startswith("data:") and ";base64," in img_data_url:
+                        import base64
+                        return base64.b64decode(img_data_url.split(";base64,")[1])
+                    else:
+                        import base64
+                        return base64.b64decode(img_data_url)
+                elif output.get("resultUrl"):
+                    result_url = output["resultUrl"]
+                    if result_url.startswith("data:") and ";base64," in result_url:
+                        import base64
+                        return base64.b64decode(result_url.split(";base64,")[1])
+                return None
+            
+            extracted_data = extract_image_data(parent_output)
+            
+            if is_end_frame:
+                # This image is for the end frame (last frame)
+                if extracted_data:
+                    last_frame_data = extracted_data
+                    print(f"[Workflow] img2video - set last_frame_data, length: {len(last_frame_data)}")
+                elif parent_output.get("resultUrl") and not parent_output.get("resultUrl").startswith("data:"):
+                    # Download from URL
                     import aiohttp
                     async with aiohttp.ClientSession() as session:
-                        async with session.get(result_url) as resp:
+                        async with session.get(parent_output["resultUrl"]) as resp:
+                            if resp.status == 200:
+                                last_frame_data = await resp.read()
+                                print(f"[Workflow] img2video - downloaded last frame, length: {len(last_frame_data)}")
+            else:
+                # Default: start frame (first frame)
+                if extracted_data:
+                    image_data = extracted_data
+                    print(f"[Workflow] img2video - decoded base64, length: {len(image_data)}")
+                elif parent_output.get("resultUrl") and not parent_output.get("resultUrl").startswith("data:"):
+                    # Download from URL
+                    print(f"[Workflow] img2video - downloading from URL: {parent_output['resultUrl'][:100]}...")
+                    import aiohttp
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(parent_output["resultUrl"]) as resp:
                             if resp.status == 200:
                                 image_data = await resp.read()
                                 print(f"[Workflow] img2video - downloaded image, length: {len(image_data)}")
+            
             if parent_output.get("text"):
                 prompt = prompt or parent_output["text"]
         
         print(f"[Workflow] img2video - final image_data: {len(image_data) if image_data else 'None'}")
+        print(f"[Workflow] img2video - last_frame_data: {len(last_frame_data) if last_frame_data else 'None'}")
         print(f"[Workflow] img2video - prompt: '{prompt}'")
         
         if image_data:
             result["status"] = "processing"
             
+            # LTX-2.3: min frames=49, max=241
+            frames = max(49, data.get("frames", 97))
+            width = max(512, data.get("width", 768))
+            height = max(512, data.get("height", 432))
+            
             gen_result = await api.generate_img2video(
                 first_frame_image=image_data,
                 prompt=prompt,
                 model=data.get("model", "Ltx2_3_22B_Dist_INT8"),
-                frames=data.get("frames", 48),
-                fps=data.get("fps", 24),
-                seed=data.get("seed", -1)
+                width=width,
+                height=height,
+                frames=frames,
+                fps=24,
+                seed=data.get("seed", -1),
+                last_frame_image=last_frame_data
             )
             
             request_id = gen_result.get("data", {}).get("request_id") or gen_result.get("request_id")
             print(f"[Workflow] img2video request_id: {request_id}")
             if request_id:
-                max_attempts = 180
-                for attempt in range(max_attempts):
-                    resp = await api.get_request_status(request_id)
-                    status_data = resp.get("data", {})
-                    api_status = status_data.get("status")
-                    if attempt % 10 == 0:
-                        print(f"[Workflow] img2video polling attempt {attempt}: status={api_status}")
-                    if api_status == "done":
-                        result["resultUrl"] = status_data.get("result_url")
-                        result["status"] = "completed"
-                        print(f"[Workflow] img2video completed: {result['resultUrl']}")
-                        break
-                    elif api_status == "error":
-                        result["status"] = "failed"
-                        result["error"] = status_data.get("error", "Generation failed")
-                        print(f"[Workflow] img2video failed: {result['error']}")
-                        break
-                    await asyncio.sleep(3)
+                poll_result = await smart_poll_for_result(api, request_id, "img2video", max_polls=25, min_delay=15)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "Video generation failed")
+    
+    elif node_type == "videoReplace":
+        # Video character replacement using WAN 2.2 Animate
+        video_data = None
+        character_data = None
+        prompt = data.get("prompt", "")
+        
+        print(f"[Workflow] videoReplace - incoming_edges: {incoming_edges}")
+        
+        # Get video and character image from inputs
+        for parent_id in incoming_edges:
+            parent_output = node_outputs.get(parent_id, {})
+            print(f"[Workflow] videoReplace - parent {parent_id} output keys: {list(parent_output.keys())}")
+            
+            # Check for video data
+            if parent_output.get("videoData"):
+                vid_data_url = parent_output["videoData"]
+                if vid_data_url.startswith("data:") and ";base64," in vid_data_url:
+                    import base64
+                    base64_data = vid_data_url.split(";base64,")[1]
+                    video_data = base64.b64decode(base64_data)
+                    print(f"[Workflow] videoReplace - decoded video from videoData, length: {len(video_data)}")
+            elif parent_output.get("videoFile"):
+                video_data = parent_output["videoFile"]
+                print(f"[Workflow] videoReplace - got videoFile from parent")
+            
+            # Check for character image data
+            if parent_output.get("imageData"):
+                img_data_url = parent_output["imageData"]
+                if img_data_url.startswith("data:") and ";base64," in img_data_url:
+                    import base64
+                    base64_data = img_data_url.split(";base64,")[1]
+                    character_data = base64.b64decode(base64_data)
+                    print(f"[Workflow] videoReplace - decoded character image, length: {len(character_data)}")
+            elif parent_output.get("characterFile"):
+                character_data = parent_output["characterFile"]
+                print(f"[Workflow] videoReplace - got characterFile from parent")
+            
+            # Get prompt from connected text input
+            if parent_output.get("text"):
+                prompt = prompt or parent_output["text"]
+        
+        print(f"[Workflow] videoReplace - video_data: {len(video_data) if video_data else 'None'}")
+        print(f"[Workflow] videoReplace - character_data: {len(character_data) if character_data else 'None'}")
+        
+        if video_data and character_data:
+            result["status"] = "processing"
+            
+            gen_result = await api.generate_video_replace(
+                video=video_data,
+                character_image=character_data,
+                prompt=prompt,
+                model=data.get("model", "Wan_2_2_14B_Animate_Replace"),
+                steps=data.get("steps", 4),
+                seed=data.get("seed", -1)
+            )
+            
+            request_id = gen_result.get("data", {}).get("request_id") or gen_result.get("request_id") or gen_result.get("uuid")
+            print(f"[Workflow] videoReplace request_id: {request_id}")
+            
+            if request_id:
+                # Video replacement takes longer, allow up to 15 minutes
+                poll_result = await smart_poll_for_result(api, request_id, "videoReplace", max_polls=30, min_delay=20, max_delay=35)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "Video replacement failed")
+        else:
+            result["status"] = "failed"
+            result["error"] = "Video and character image are required"
+            print(f"[Workflow] videoReplace - missing inputs: video={bool(video_data)}, character={bool(character_data)}")
     
     elif node_type == "tts":
         # Text-to-Speech generation
@@ -453,20 +602,14 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
             
             request_id = gen_result.get("data", {}).get("request_id") or gen_result.get("request_id")
             if request_id:
-                max_attempts = 60  # TTS is usually fast
-                for _ in range(max_attempts):
-                    resp = await api.get_request_status(request_id)
-                    status_data = resp.get("data", {})
-                    api_status = status_data.get("status")
-                    if api_status == "done":
-                        result["resultUrl"] = status_data.get("result_url")
-                        result["status"] = "completed"
-                        break
-                    elif api_status == "error":
-                        result["status"] = "failed"
-                        result["error"] = status_data.get("error", "TTS failed")
-                        break
-                    await asyncio.sleep(2)
+                # TTS is usually fast
+                poll_result = await smart_poll_for_result(api, request_id, "tts", max_polls=10, min_delay=5, max_delay=15)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "TTS failed")
     
     elif node_type == "imageAnalysis":
         # Image-to-Text (OCR) analysis
@@ -526,43 +669,30 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
                 print(f"[Workflow] imageAnalysis - request_id: {request_id}")
                 
                 if request_id:
-                    max_attempts = 60
-                    for attempt in range(max_attempts):
-                        resp = await api.get_request_status(request_id)
-                        status_data = resp.get("data", {})
-                        api_status = status_data.get("status")
+                    poll_result = await smart_poll_for_result(api, request_id, "imageAnalysis", max_polls=10, min_delay=8, max_delay=20)
+                    if poll_result["status"] == "completed":
+                        raw_text = poll_result.get("result", "") or poll_result.get("result_url", "")
+                        print(f"[Workflow] imageAnalysis - raw result: {raw_text[:200] if raw_text else 'None'}...")
                         
-                        if attempt % 5 == 0:
-                            print(f"[Workflow] imageAnalysis polling attempt {attempt}: status={api_status}")
-                        
-                        if api_status == "done":
-                            raw_text = status_data.get("result", "")
-                            print(f"[Workflow] imageAnalysis - raw result: {raw_text[:200] if raw_text else 'None'}...")
-                            
-                            # Parse text from <img>...</img> tags if present
-                            import re
-                            if raw_text and "<img>" in raw_text:
-                                match = re.search(r'<img>(.*?)</img>', raw_text, re.DOTALL)
-                                if match:
-                                    extracted_text = match.group(1).strip()
-                                else:
-                                    extracted_text = raw_text
+                        # Parse text from <img>...</img> tags if present
+                        import re
+                        if raw_text and "<img>" in raw_text:
+                            match = re.search(r'<img>(.*?)</img>', raw_text, re.DOTALL)
+                            if match:
+                                extracted_text = match.group(1).strip()
                             else:
                                 extracted_text = raw_text
-                            
-                            print(f"[Workflow] imageAnalysis - extracted text: {extracted_text[:200] if extracted_text else 'None'}...")
-                            
-                            result["text"] = extracted_text
-                            result["resultUrl"] = status_data.get("result_url")
-                            result["status"] = "completed"
-                            break
-                        elif api_status == "error":
-                            result["status"] = "failed"
-                            result["error"] = status_data.get("error", "OCR failed")
-                            print(f"[Workflow] imageAnalysis failed: {result['error']}")
-                            break
+                        else:
+                            extracted_text = raw_text
                         
-                        await asyncio.sleep(2)
+                        print(f"[Workflow] imageAnalysis - extracted text: {extracted_text[:200] if extracted_text else 'None'}...")
+                        
+                        result["text"] = extracted_text
+                        result["resultUrl"] = poll_result.get("result_url")
+                        result["status"] = "completed"
+                    else:
+                        result["status"] = "failed"
+                        result["error"] = poll_result.get("error", "OCR failed")
                 else:
                     result["status"] = "failed"
                     result["error"] = "No request_id returned from API"
@@ -611,27 +741,13 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
             print(f"[Workflow] bgRemoval request_id: {request_id}")
             
             if request_id:
-                max_attempts = 120
-                for attempt in range(max_attempts):
-                    resp = await api.get_request_status(request_id)
-                    status_data = resp.get("data", {})
-                    api_status = status_data.get("status")
-                    
-                    if attempt % 10 == 0:
-                        print(f"[Workflow] bgRemoval polling attempt {attempt}: status={api_status}")
-                    
-                    if api_status == "done":
-                        result["resultUrl"] = status_data.get("result_url")
-                        result["status"] = "completed"
-                        print(f"[Workflow] bgRemoval completed: {result['resultUrl']}")
-                        break
-                    elif api_status == "error":
-                        result["status"] = "failed"
-                        result["error"] = status_data.get("error", "Background removal failed")
-                        print(f"[Workflow] bgRemoval failed: {result['error']}")
-                        break
-                    
-                    await asyncio.sleep(2)
+                poll_result = await smart_poll_for_result(api, request_id, "bgRemoval", max_polls=12, min_delay=8)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "Background removal failed")
     
     elif node_type == "videoToText":
         # Video-to-text transcription
@@ -660,28 +776,14 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
                 print(f"[Workflow] videoToText request_id: {request_id}")
                 
                 if request_id:
-                    max_attempts = 180  # Videos take longer
-                    for attempt in range(max_attempts):
-                        resp = await api.get_request_status(request_id)
-                        status_data = resp.get("data", {})
-                        api_status = status_data.get("status")
-                        
-                        if attempt % 10 == 0:
-                            print(f"[Workflow] videoToText polling attempt {attempt}: status={api_status}")
-                        
-                        if api_status == "done":
-                            result["text"] = status_data.get("result")
-                            result["resultUrl"] = status_data.get("result_url")
-                            result["status"] = "completed"
-                            print(f"[Workflow] videoToText completed, text length: {len(result.get('text', ''))}")
-                            break
-                        elif api_status == "error":
-                            result["status"] = "failed"
-                            result["error"] = status_data.get("error", "Transcription failed")
-                            print(f"[Workflow] videoToText failed: {result['error']}")
-                            break
-                        
-                        await asyncio.sleep(3)
+                    poll_result = await smart_poll_for_result(api, request_id, "videoToText", max_polls=20, min_delay=15)
+                    if poll_result["status"] == "completed":
+                        result["text"] = poll_result.get("result", "")
+                        result["resultUrl"] = poll_result.get("result_url")
+                        result["status"] = "completed"
+                    else:
+                        result["status"] = "failed"
+                        result["error"] = poll_result.get("error", "Transcription failed")
             except Exception as e:
                 print(f"[Workflow] videoToText - ERROR: {str(e)}")
                 result["status"] = "failed"
@@ -731,27 +833,13 @@ async def execute_node(node: NodeData, G: nx.DiGraph, node_outputs: Dict, api, i
             print(f"[Workflow] imageEnhance request_id: {request_id}")
             
             if request_id:
-                max_attempts = 120
-                for attempt in range(max_attempts):
-                    resp = await api.get_request_status(request_id)
-                    status_data = resp.get("data", {})
-                    api_status = status_data.get("status")
-                    
-                    if attempt % 10 == 0:
-                        print(f"[Workflow] imageEnhance polling attempt {attempt}: status={api_status}")
-                    
-                    if api_status == "done":
-                        result["resultUrl"] = status_data.get("result_url")
-                        result["status"] = "completed"
-                        print(f"[Workflow] imageEnhance completed: {result['resultUrl']}")
-                        break
-                    elif api_status == "error":
-                        result["status"] = "failed"
-                        result["error"] = status_data.get("error", "Enhancement failed")
-                        print(f"[Workflow] imageEnhance failed: {result['error']}")
-                        break
-                    
-                    await asyncio.sleep(2)
+                poll_result = await smart_poll_for_result(api, request_id, "imageEnhance", max_polls=15, min_delay=10)
+                if poll_result["status"] == "completed":
+                    result["resultUrl"] = poll_result["result_url"]
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
+                    result["error"] = poll_result.get("error", "Enhancement failed")
     
     elif node_type == "aiAssistant":
         # AI Assistant node - process text through AI using iFlow API

@@ -54,6 +54,20 @@
               <span>{{ $t('imageEdit.imageLoaded') }}</span>
             </div>
           </div>
+          
+          <!-- Model and Dimensions Selectors -->
+          <div class="prompt-options">
+            <select v-model="localModel" class="option-select">
+              <option value="QwenImageEdit_Plus_NF4">Qwen Image Edit</option>
+              <option value="Flux_2_Klein_4B_BF16">FLUX.2 Klein</option>
+            </select>
+            <select v-model="localDimensions" class="option-select">
+              <option value="768x768">768×768</option>
+              <option value="512x512">512×512</option>
+              <option value="1024x1024">1024×1024</option>
+            </select>
+          </div>
+          
           <div class="generate-btn-wrapper">
             <button
               @click="handleEdit"
@@ -72,12 +86,7 @@
                 <span>{{ $t('imageEdit.editImage') }}</span>
               </span>
             </button>
-            <div class="credit-badge">
-              <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
-              </svg>
-              <span>{{ editCredits }}</span>
-            </div>
+
           </div>
         </div>
       </div>
@@ -138,22 +147,12 @@ export default {
       pollingId: null,
       recentEdits: [],
       modalVisible: false,
-      selectedEdit: {}
+      selectedEdit: {},
+      localModel: 'QwenImageEdit_Plus_NF4',
+      localDimensions: '768x768'
     }
   },
   computed: {
-    editCredits() {
-      const img2imgCredits = {
-        'QwenImageEdit_Plus_NF4': { 512: 40, 768: 70, 1024: 100 },
-        'Flux_2_Klein_4B_BF16': { 768: 12, 1024: 16, 1536: 25 }
-      }
-      
-      const model = this.generationOptions?.model || 'QwenImageEdit_Plus_NF4'
-      const pricing = img2imgCredits[model] || img2imgCredits['QwenImageEdit_Plus_NF4']
-      
-      // Default to medium size
-      return pricing[768] || 40
-    }
   },
   mounted() {
     this.loadRecentEdits()
@@ -183,11 +182,14 @@ export default {
       
       this.generating = true
       try {
+        const [width, height] = (this.localDimensions || '768x768').split('x').map(Number)
         const result = await api.generateImg2Img(this.sourceImage, this.prompt, {
-          model: this.generationOptions.model || 'QwenImageEdit_Plus_NF4',
-          steps: this.generationOptions.steps || 20,
-          guidance: this.generationOptions.guidance || 3.5,
-          seed: this.generationOptions.seed ?? -1
+          model: this.localModel || 'QwenImageEdit_Plus_NF4',
+          width: width,
+          height: height,
+          steps: this.localModel === 'Flux_2_Klein_4B_BF16' ? 4 : 20,
+          guidance: 3.5,
+          seed: -1
         })
         
         this.startPolling(result.id)
@@ -201,6 +203,7 @@ export default {
     
     startPolling(generationId) {
       this.stopPolling()
+      // Increased from 5s to 15s to reduce API requests
       this.pollingId = setInterval(async () => {
         try {
           const updated = await api.getStatus(generationId)
@@ -219,7 +222,7 @@ export default {
         } catch (error) {
           console.error('Polling error:', error)
         }
-      }, 5000)
+      }, 15000)
       
       // Timeout after 10 minutes
       setTimeout(() => {
@@ -410,8 +413,10 @@ export default {
 
 .prompt-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid var(--border-color);
@@ -421,6 +426,57 @@ export default {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+/* Prompt Options - Model and Dimensions dropdowns */
+.prompt-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.option-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-right: -4px;
+}
+
+.option-select {
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A3A3A3' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+  min-width: 120px;
+}
+
+.option-select:hover {
+  border-color: var(--border-hover);
+  background-color: var(--bg-elevated);
+}
+
+.option-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.option-select option {
+  background: var(--bg-panel) !important;
+  color: var(--text-primary) !important;
+  padding: 8px;
 }
 
 .uploaded-info {
@@ -440,25 +496,6 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.credit-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08));
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #22C55E;
-  white-space: nowrap;
-}
-
-.credit-badge .credit-icon {
-  width: 16px;
-  height: 16px;
 }
 
 .generate-btn {
@@ -527,9 +564,74 @@ export default {
   gap: 12px;
 }
 
-@media (max-width: 900px) {
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .image-edit {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .preview-area {
+    min-height: 200px;
+  }
+
+  .prompt-area {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .prompt-wrapper {
+    border-radius: 10px;
+  }
+
+  .prompt-input {
+    padding: 14px 16px;
+    font-size: 0.875rem;
+  }
+
+  .prompt-footer {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .prompt-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .prompt-options {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .option-select {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    padding-right: 28px;
+    font-size: 0.75rem;
+    background-position: right 8px center;
+  }
+
+  .generate-btn-wrapper {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .generate-btn {
+    width: 100%;
+    padding: 12px 20px;
+  }
+
+  .recent-section {
+    width: 100%;
+  }
+
   .recent-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 }
 </style>

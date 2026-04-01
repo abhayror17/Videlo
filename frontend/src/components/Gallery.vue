@@ -136,7 +136,7 @@ export default {
         this.generations = response.items
         this.totalPages = response.pages
       } catch (error) {
-        console.error('Failed to load generations:', error)
+        // Silently handle errors
       } finally {
         this.loading = false
         this.initialLoad = false

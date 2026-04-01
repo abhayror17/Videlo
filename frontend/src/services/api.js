@@ -66,6 +66,10 @@ export default {
     formData.append('frames', options.frames || 24)
     formData.append('fps', options.fps || 30)
     formData.append('seed', options.seed ?? -1)
+    // Optional end frame (last frame) for LTX-2.3
+    if (options.lastFrameGenerationId) {
+      formData.append('last_frame_generation_id', options.lastFrameGenerationId)
+    }
 
     const response = await api.post('/generate/img2video', formData, {
       headers: {
@@ -89,6 +93,10 @@ export default {
     formData.append('frames', options.frames || 24)
     formData.append('fps', options.fps || 30)
     formData.append('seed', options.seed ?? -1)
+    // Optional end frame file for LTX-2.3
+    if (options.lastFrameFile) {
+      formData.append('last_frame', options.lastFrameFile)
+    }
 
     const response = await api.post('/generate/img2video', formData, {
       headers: {
@@ -235,6 +243,12 @@ export default {
     return response.data
   },
 
+  // Check and update status of processing generations
+  async checkAdCampaignStatus(campaignId) {
+    const response = await api.get(`/ads/campaigns/${campaignId}/check-status`)
+    return response.data
+  },
+
   // Phase 2: Submit answers to clarification questions
   async submitAdCampaignAnswers(campaignId, answers) {
     const response = await api.post(`/ads/campaigns/${campaignId}/answers`, {
@@ -272,6 +286,40 @@ export default {
 
   async generateAdVideoPrompts(campaignId) {
     const response = await api.post(`/ads/campaigns/${campaignId}/video-prompts`)
+    return response.data
+  },
+
+  // Phase 7.5-8.5: Execute scene asset generation
+  async generateAdCampaignImages(campaignId) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/generate-images`, null, {
+      timeout: 180000
+    })
+    return response.data
+  },
+
+  async generateAdCampaignVideos(campaignId) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/generate-videos`, null, {
+      timeout: 180000
+    })
+    return response.data
+  },
+
+  async regenerateAdSceneImage(campaignId, scenePromptId, prompt) {
+    const response = await api.post(`/ads/campaigns/${campaignId}/scenes/${scenePromptId}/regenerate-image`, null, {
+      params: { prompt },
+      timeout: 180000
+    })
+    return response.data
+  },
+
+  async regenerateAdSceneVideo(campaignId, scenePromptId, prompt = null) {
+    const config = {
+      timeout: 180000
+    }
+    if (prompt) {
+      config.params = { prompt }
+    }
+    const response = await api.post(`/ads/campaigns/${campaignId}/scenes/${scenePromptId}/regenerate-video`, null, config)
     return response.data
   },
 
@@ -454,11 +502,213 @@ export default {
     const formData = new FormData()
     formData.append('task_id', taskId)
     formData.append('prompt', prompt)
-    
+
     const response = await api.post('/generate/nanobanana/query', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
+    })
+    return response.data
+  },
+
+  // ============================================================
+  // AI AVATAR PIPELINE
+  // ============================================================
+
+  // Create a new AI Avatar project
+  async createAiAvatar(data) {
+    const response = await api.post('/avatar', {
+      name: data.name,
+      portrait_prompt: data.portraitPrompt,
+      speech_text: data.speechText,
+      motion_prompt: data.motionPrompt,
+      voice_model: data.voiceModel || 'Kokoro',
+      voice_id: data.voiceId || 'af_sky',
+      voice_speed: data.voiceSpeed || 1.0,
+      voice_lang: data.voiceLang || 'en-us',
+      portrait_model: data.portraitModel || 'Flux_2_Klein_4B_BF16',
+      portrait_width: data.portraitWidth || 512,
+      portrait_height: data.portraitHeight || 512,
+      animation_model: data.animationModel || 'Ltx2_3_22B_Dist_INT8',
+      animation_frames: data.animationFrames || 24,
+      animation_fps: data.animationFps || 30
+    })
+    return response.data
+  },
+
+  // List AI Avatar projects
+  async getAiAvatars(page = 1, perPage = 10) {
+    const response = await api.get('/avatar', {
+      params: { page, per_page: perPage }
+    })
+    return response.data
+  },
+
+  // Get a specific AI Avatar project
+  async getAiAvatar(projectId) {
+    const response = await api.get(`/avatar/${projectId}`)
+    return response.data
+  },
+
+  // Get AI Avatar project status (checks deAPI for updates)
+  async getAiAvatarStatus(projectId) {
+    const response = await api.get(`/avatar/${projectId}/status`)
+    return response.data
+  },
+
+  // Delete an AI Avatar project
+  async deleteAiAvatar(projectId) {
+    const response = await api.delete(`/avatar/${projectId}`)
+    return response.data
+  },
+
+  // Update an AI Avatar project (e.g., rename)
+  async updateAiAvatar(projectId, data) {
+    const response = await api.patch(`/avatar/${projectId}`, data)
+    return response.data
+  },
+
+  // Generate avatar content (specific step or all)
+  async generateAiAvatar(projectId, step = 'all') {
+    const response = await api.post(`/avatar/${projectId}/generate`, {
+      step
+    })
+    return response.data
+  },
+
+  // Regenerate with modified parameters
+  async regenerateAiAvatar(projectId, data) {
+    const response = await api.post(`/avatar/${projectId}/regenerate`, {
+      portrait_prompt: data.portraitPrompt,
+      speech_text: data.speechText,
+      motion_prompt: data.motionPrompt,
+      voice_id: data.voiceId,
+      voice_speed: data.voiceSpeed
+    })
+    return response.data
+  },
+
+  // ============================================================
+  // VIDEO REPLACE (WAN 2.2 ANIMATE)
+  // ============================================================
+
+  // Replace character in video with reference image
+  async generateVideoReplace(videoFile, characterImageFile, options = {}) {
+    const formData = new FormData()
+    formData.append('video', videoFile)
+    formData.append('character_image', characterImageFile)
+    
+    if (options.prompt) {
+      formData.append('prompt', options.prompt)
+    }
+    formData.append('model', options.model || 'Wan_2_2_14B_Animate_Replace')
+    formData.append('steps', options.steps || 4)
+    formData.append('seed', options.seed ?? -1)
+    
+    if (options.width) {
+      formData.append('width', options.width)
+    }
+    if (options.height) {
+      formData.append('height', options.height)
+    }
+
+    const response = await api.post('/generate/video-replace', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      timeout: 300000 // 5 minutes for video processing
+    })
+    return response.data
+  },
+
+  // ============================================================
+  // UGC AI ADS CREATOR
+  // ============================================================
+
+  // Search for matching prompts from the library
+  async searchUgcPrompts(query, options = {}) {
+    const response = await api.post('/ugc-ads/prompts/search', {
+      query,
+      product_type: options.productType,
+      category: options.category,
+      mood: options.mood,
+      limit: options.limit || 5
+    })
+    return response.data
+  },
+
+  // Get a specific prompt by ID
+  async getUgcPrompt(promptId) {
+    const response = await api.get(`/ugc-ads/prompts/${promptId}`)
+    return response.data
+  },
+
+  // Create a new UGC ad story
+  async createUgcStory(data) {
+    const response = await api.post('/ugc-ads/stories', {
+      product_name: data.productName,
+      product_description: data.productDescription,
+      product_category: data.productCategory,
+      character_name: data.characterName,
+      character_description: data.characterDescription,
+      character_reference_url: data.characterReferenceUrl,
+      product_reference_url: data.productReferenceUrl,
+      target_audience: data.targetAudience,
+      platform: data.platform || 'Instagram',
+      ad_goal: data.adGoal || 'product_awareness',
+      tone: data.tone || 'authentic',
+      setting_preference: data.settingPreference,
+      total_duration_sec: data.totalDurationSec || 15
+    }, {
+      timeout: 120000
+    })
+    return response.data
+  },
+
+  // List UGC ad stories
+  async getUgcStories(page = 1, perPage = 10, status = null) {
+    const params = { page, per_page: perPage }
+    if (status) params.status = status
+    
+    const response = await api.get('/ugc-ads/stories', { params })
+    return response.data
+  },
+
+  // Get a specific UGC story
+  async getUgcStory(storyId) {
+    const response = await api.get(`/ugc-ads/stories/${storyId}`)
+    return response.data
+  },
+
+  // Delete a UGC story
+  async deleteUgcStory(storyId) {
+    const response = await api.delete(`/ugc-ads/stories/${storyId}`)
+    return response.data
+  },
+
+  // Generate images and videos for a story
+  async generateUgcStoryAssets(storyId, options = {}) {
+    const response = await api.post(`/ugc-ads/stories/${storyId}/generate`, {
+      generate_images: options.generateImages ?? true,
+      generate_videos: options.generateVideos ?? true,
+      model: options.model || 'Flux_2_Klein_4B_BF16',
+      video_model: options.videoModel || 'Ltx2_3_22B_Dist_INT8',
+      aspect_ratio: options.aspectRatio || '16:9'
+    }, {
+      timeout: 300000 // 5 minutes
+    })
+    return response.data
+  },
+
+  // Regenerate a specific shot
+  async regenerateUgcShot(storyId, shotId, options = {}) {
+    const response = await api.post(`/ugc-ads/stories/${storyId}/shots/regenerate`, {
+      shot_id: shotId,
+      regenerate_image: options.regenerateImage ?? true,
+      regenerate_video: options.regenerateVideo ?? true,
+      custom_prompt: options.customPrompt
+    }, {
+      timeout: 180000
     })
     return response.data
   }

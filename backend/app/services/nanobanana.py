@@ -286,29 +286,46 @@ class NanoBananaClient:
                     result_data = data.get("data", {})
                     status = result_data.get("status")
                     
-                    # Parse image URLs from nested JSON structure
+                    # Parse image URLs from nested response structures
                     image_urls = []
-                    
+
                     # Parse taskResult JSON string
                     task_result = result_data.get("taskResult", "{}")
                     if isinstance(task_result, str):
                         try:
                             task_result = json.loads(task_result)
-                        except:
+                        except Exception:
                             task_result = {}
-                    
+
                     # Parse resultJson from taskResult
                     result_json = task_result.get("resultJson", "")
                     if result_json:
                         try:
                             result_obj = json.loads(result_json)
-                            # Get resultUrls array
                             urls = result_obj.get("resultUrls", [])
                             if urls:
                                 image_urls = urls if isinstance(urls, list) else [urls]
-                        except:
+                        except Exception:
                             pass
-                    
+
+                    # Parse taskInfo images when provider returns URLs there
+                    if not image_urls:
+                        task_info = result_data.get("taskInfo", "{}")
+                        if isinstance(task_info, str):
+                            try:
+                                task_info = json.loads(task_info)
+                            except Exception:
+                                task_info = {}
+
+                        images = task_info.get("images", []) if isinstance(task_info, dict) else []
+                        for image in images:
+                            if isinstance(image, dict):
+                                image_url = image.get("imageUrl") or image.get("url")
+                                if image_url:
+                                    image_urls.append(image_url)
+                            elif isinstance(image, str):
+                                image_urls.append(image)
+
                     # Fallback: check other fields
                     if not image_urls:
                         if result_data.get("output_images"):
@@ -317,6 +334,9 @@ class NanoBananaClient:
                         elif result_data.get("output"):
                             output = result_data["output"]
                             image_urls = output if isinstance(output, list) else [output]
+
+                    # Final cleanup to keep URLs unique and non-empty
+                    image_urls = [url for url in dict.fromkeys(image_urls) if url]
                     
                     print(f"[NanoBanana] Status: {status}, Images: {image_urls}")
                     
@@ -396,6 +416,79 @@ class NanoBananaClient:
             success=False,
             error="Generation timed out"
         )
+
+    async def generate_multiple_and_wait(
+        self,
+        prompt: str,
+        model: NanoBananaModel = NanoBananaModel.NANO_BANANA_2,
+        aspect_ratio: AspectRatio = AspectRatio.SQUARE,
+        reference_images: Optional[List[str]] = None,
+        num_images: int = 3,
+        max_wait_seconds: int = 120,
+        poll_interval: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Run multiple Nano Banana generations in parallel and collect successes safely.
+
+        This is used when the caller wants several candidate outputs at once.
+        A single task exception should not crash the whole batch.
+        """
+        import asyncio
+
+        num_images = max(1, int(num_images or 1))
+        semaphore = asyncio.Semaphore(min(num_images, 3))
+
+        async def _run_generation(index: int) -> Dict[str, Any]:
+            async with semaphore:
+                result = await self.generate_and_wait(
+                    prompt=prompt,
+                    model=model,
+                    aspect_ratio=aspect_ratio,
+                    reference_images=reference_images,
+                    max_wait_seconds=max_wait_seconds,
+                    poll_interval=poll_interval
+                )
+
+                if not result.success or not result.image_urls:
+                    raise RuntimeError(result.error or f"Generation {index + 1} failed")
+
+                return {
+                    "index": index,
+                    "task_id": result.task_id,
+                    "status": result.status,
+                    "image_urls": result.image_urls,
+                }
+
+        raw_results = await asyncio.gather(
+            *[_run_generation(index) for index in range(num_images)],
+            return_exceptions=True
+        )
+
+        successes: List[Dict[str, Any]] = []
+        errors: List[str] = []
+        image_urls: List[str] = []
+
+        for index, item in enumerate(raw_results):
+            if isinstance(item, Exception):
+                errors.append(str(item))
+                continue
+
+            successes.append(item)
+            for image_url in item.get("image_urls", []):
+                if image_url and image_url not in image_urls:
+                    image_urls.append(image_url)
+
+        return {
+            "success": len(successes) > 0,
+            "num_requested": num_images,
+            "num_succeeded": len(successes),
+            "num_failed": len(errors),
+            "primary_task_id": successes[0].get("task_id") if successes else None,
+            "image_urls": image_urls,
+            "results": successes,
+            "errors": errors,
+            "error": "; ".join(errors) if errors else None,
+        }
 
 
 # Singleton client

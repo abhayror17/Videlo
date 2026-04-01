@@ -47,37 +47,10 @@
               </svg>
               <span>{{ $t('nav.img2video') }}</span>
             </router-link>
-            <router-link to="/ads" class="nav-item" active-class="active">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                <path d="M10 9l5 3-5 3V9z"/>
-                <circle cx="17" cy="7" r="2"/>
-                <path d="M17 7l2-2"/>
-              </svg>
-              <span>{{ $t('nav.ads') }}</span>
-            </router-link>
-            <router-link to="/ads-img-gen" class="nav-item" active-class="active">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <path d="M21 15l-5-5L5 21"/>
-                <path d="M12 2v4m0 12v4"/>
-              </svg>
-              <span>{{ $t('nav.adsImgGen') }}</span>
-            </router-link>
           </div>
           
           <div class="nav-section">
             <span class="nav-section-title">{{ $t('nav.library') }}</span>
-            <router-link to="/gallery" class="nav-item" active-class="active">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
-              </svg>
-              <span>{{ $t('nav.gallery') }}</span>
-            </router-link>
             <router-link to="/prompts" class="nav-item" active-class="active">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/>
@@ -99,15 +72,32 @@
               </svg>
               <span>{{ $t('nav.workflow') }}</span>
             </router-link>
+            <router-link to="/ads" class="nav-item" active-class="active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19h16"/>
+                <path d="M6 15V9"/>
+                <path d="M10 15V5"/>
+                <path d="M14 15v-3"/>
+                <path d="M18 15V7"/>
+              </svg>
+              <span>{{ $t('nav.ads') }}</span>
+            </router-link>
+            <router-link to="/avatar" class="nav-item" active-class="active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+              </svg>
+              <span>{{ $t('nav.avatar') }}</span>
+            </router-link>
+            <router-link to="/ugc-ads" class="nav-item" active-class="active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+              <span>UGC Ads</span>
+            </router-link>
           </div>
         </nav>
-        
-        <div class="sidebar-footer">
-          <div class="api-balance">
-            <span class="balance-label">{{ $t('nav.credits') }}</span>
-            <span class="balance-value">{{ balance !== null ? '$' + balance.toFixed(2) : '--' }}</span>
-          </div>
-        </div>
       </aside>
 
       <!-- Main Content -->
@@ -143,187 +133,6 @@
           />
         </div>
       </main>
-
-      <!-- Right Settings Panel -->
-      <aside v-if="showSettingsPanel" class="settings-panel">
-        <div class="settings-tabs">
-          <button 
-            :class="['tab', { active: settingsTab === 'form' }]"
-            @click="settingsTab = 'form'"
-          >{{ $t('settings.form') }}</button>
-          <button 
-            :class="['tab', { active: settingsTab === 'json' }]"
-            @click="settingsTab = 'json'"
-          >{{ $t('settings.json') }}</button>
-        </div>
-
-        <div v-if="settingsTab === 'form'" class="settings-form">
-          <!-- Model Selection -->
-          <div class="setting-group">
-            <label>{{ $t('settings.model') }}</label>
-            <select v-model="generationOptions.model" class="setting-select">
-              <optgroup v-if="currentMode === 'text2img'" :label="$t('settings.imageModels')">
-                <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
-                <option value="ZImageTurbo_INT8">ZImage Turbo</option>
-              </optgroup>
-              <optgroup v-else-if="currentMode === 'imgedit'" :label="$t('settings.imageEditModels')">
-                <option value="QwenImageEdit_Plus_NF4">Qwen Image Edit</option>
-                <option value="Flux_2_Klein_4B_BF16">Flux 2 Klein</option>
-              </optgroup>
-              <optgroup v-else :label="$t('settings.videoModels')">
-                <option value="Ltx2_3_22B_Dist_INT8">LTX-2.3 22B (Recommended)</option>
-                <option value="Ltx2_19B_Dist_FP8">LTX-2 19B</option>
-                <option value="Ltxv_13B_0_9_8_Distilled_FP8">LTX-Video 13B</option>
-                <option value="Wan2_1_14B_T2V_BF16">Wan 2.1 T2V</option>
-                <option value="HunyuanVideo_BF16">Hunyuan Video</option>
-              </optgroup>
-            </select>
-          </div>
-
-          <!-- Dimensions (hide for imgedit) -->
-          <div v-if="currentMode !== 'imgedit'" class="setting-group">
-            <label>{{ $t('settings.dimensions') }}</label>
-            <div class="dimension-inputs">
-              <div class="dim-input">
-                <input 
-                  type="number" 
-                  v-model.number="generationOptions.width"
-                  min="256"
-                  max="2048"
-                  step="64"
-                >
-                <span>W</span>
-              </div>
-              <div class="dim-input">
-                <input 
-                  type="number" 
-                  v-model.number="generationOptions.height"
-                  min="256"
-                  max="2048"
-                  step="64"
-                >
-                <span>H</span>
-              </div>
-            </div>
-            <div class="aspect-presets">
-              <button 
-                v-for="preset in aspectPresets" 
-                :key="preset.label"
-                :class="['preset-btn', { active: activeAspectPreset === preset.label }]"
-                @click="setAspectPreset(preset)"
-              >{{ preset.label }}</button>
-            </div>
-          </div>
-
-          <!-- Steps -->
-          <div class="setting-group">
-            <div class="setting-header">
-              <label>{{ $t('settings.steps') }}</label>
-              <span class="setting-value">{{ generationOptions.steps }}</span>
-            </div>
-            <input 
-              v-if="generationOptions.model !== 'Flux_2_Klein_4B_BF16'"
-              type="range" 
-              v-model.number="generationOptions.steps"
-              :min="currentMode === 'text2img' ? 1 : 10"
-              :max="currentMode === 'text2img' ? 30 : 50"
-              class="setting-slider"
-            >
-            <div v-else class="steps-fixed">
-              <span class="fixed-label">{{ $t('settings.fixedAtFlux') }}</span>
-            </div>
-            <div class="slider-labels" v-if="generationOptions.model !== 'Flux_2_Klein_4B_BF16'">
-              <span>{{ $t('settings.fast') }}</span>
-              <span>{{ $t('settings.quality') }}</span>
-            </div>
-          </div>
-
-          <!-- Guidance -->
-          <div class="setting-group">
-            <div class="setting-header">
-              <label>{{ $t('settings.guidanceScale') }}</label>
-              <span class="setting-value">{{ generationOptions.guidance }}</span>
-            </div>
-            <input 
-              type="range" 
-              v-model.number="generationOptions.guidance"
-              min="1"
-              max="10"
-              step="0.5"
-              class="setting-slider"
-            >
-          </div>
-
-          <!-- Seed -->
-          <div class="setting-group">
-            <label>{{ $t('settings.seed') }}</label>
-            <div class="seed-input-wrapper">
-              <input 
-                type="number" 
-                v-model.number="generationOptions.seed"
-                :placeholder="$t('settings.random')"
-                class="setting-input"
-              >
-              <button class="seed-random-btn" @click="generationOptions.seed = -1" :title="$t('settings.random')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="2" width="8" height="8" rx="1"/>
-                  <rect x="14" y="2" width="8" height="8" rx="1"/>
-                  <rect x="2" y="14" width="8" height="8" rx="1"/>
-                  <rect x="14" y="14" width="8" height="8" rx="1"/>
-                  <circle cx="5" cy="5" r="1" fill="currentColor"/>
-                  <circle cx="19" cy="5" r="1" fill="currentColor"/>
-                  <circle cx="5" cy="19" r="1" fill="currentColor"/>
-                  <circle cx="17" cy="17" r="1" fill="currentColor"/>
-                  <circle cx="19" cy="19" r="1" fill="currentColor"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Video Options -->
-          <template v-if="currentMode === 'txt2video' || currentMode === 'img2video'">
-            <div class="setting-divider"></div>
-            
-            <div class="setting-group">
-              <label>{{ $t('settings.duration') }}</label>
-              <select v-model.number="generationOptions.frames" class="setting-select">
-                <option :value="49">~2 {{ $t('settings.seconds') }}</option>
-                <option :value="120">~5 {{ $t('settings.seconds') }}</option>
-                <option :value="241">~10 {{ $t('settings.seconds') }}</option>
-              </select>
-            </div>
-
-            <div class="setting-group">
-              <label>{{ $t('settings.fps') }}</label>
-              <select v-model.number="generationOptions.fps" class="setting-select">
-                <option :value="24">24 FPS</option>
-              </select>
-            </div>
-          </template>
-          
-          <!-- Credit Estimate -->
-          <div class="setting-divider"></div>
-          <div class="credit-estimate">
-            <div class="credit-row">
-              <span class="credit-label">
-                <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
-                </svg>
-                {{ $t('credits.estimated') }}
-              </span>
-              <span class="credit-value">{{ estimatedCredits }} {{ $t('credits.credits') }}</span>
-            </div>
-            <p class="credit-hint" v-if="currentMode === 'txt2video' || currentMode === 'img2video'">
-              {{ $t('credits.videoHint') }}
-            </p>
-          </div>
-        </div>
-
-        <!-- JSON Tab -->
-        <div v-else class="settings-json">
-          <pre>{{ JSON.stringify(generationOptions, null, 2) }}</pre>
-        </div>
-      </aside>
     </div>
 
     <!-- BYOK Settings Modal -->
@@ -406,8 +215,6 @@ export default {
   },
   data() {
     return {
-      settingsTab: 'form',
-      balance: null,
       showSettingsModal: false,
       customApiKey: '',
       showApiKey: false,
@@ -431,77 +238,9 @@ export default {
       const titleKey = this.$route.meta.title
       return titleKey ? this.t(titleKey) : this.t('nav.generate')
     },
-    showSettingsPanel() {
-      // Hide settings for ads (uses internal pipeline), gallery, prompts, workflow, img-gen, and ads-img-gen
-      return !['ads', 'gallery', 'prompts', 'workflow', 'img-gen', 'ads-img-gen'].includes(this.$route.name)
-    },
     hasCustomApiKey() {
       return !!localStorage.getItem('deapi_key')
     },
-    aspectPresets() {
-      return [
-        { label: '1:1', width: 1024, height: 1024 },
-        { label: '16:9', width: 1024, height: 576 },
-        { label: '9:16', width: 576, height: 1024 },
-        { label: '4:3', width: 1024, height: 768 }
-      ]
-    },
-    activeAspectPreset() {
-      const w = this.generationOptions.width
-      const h = this.generationOptions.height
-      const preset = this.aspectPresets.find(p => p.width === w && p.height === h)
-      return preset?.label || null
-    },
-    estimatedCredits() {
-      // Credit pricing tables
-      const txt2imgCredits = {
-        'Flux1schnell': { 512: 4, 768: 5, 1024: 8, 1536: 12, 2048: 18 },
-        'Flux_2_Klein_4B_BF16': { 512: 5, 768: 8, 1024: 10, 1536: 15 },
-        'ZImageTurbo_INT8': { 512: 8, 768: 12, 1024: 20, 1536: 30, 2048: 45 }
-      }
-      const videoCredits = {
-        'Ltx2_3_22B_Dist_INT8': { '512x512x49': 8, '768x768x120': 20, '1024x1024x120': 30, '768x768x241': 35, '1024x1024x241': 50 },
-        'Ltx2_19B_Dist_FP8': { '512x512x49': 12, '768x768x120': 80, '1024x1024x120': 120, '768x768x241': 140 },
-        'Ltxv_13B_0_9_8_Distilled_FP8': { '512x512x30': 5, '512x512x60': 8, '512x512x120': 12, '768x768x120': 20 }
-      }
-      const img2imgCredits = {
-        'QwenImageEdit_Plus_NF4': { 512: 40, 768: 70, 1024: 100 },
-        'Flux_2_Klein_4B_BF16': { 768: 12, 1024: 16, 1536: 25 }
-      }
-      
-      const model = this.generationOptions.model
-      const width = this.generationOptions.width
-      const height = this.generationOptions.height
-      const maxDim = Math.max(width, height)
-      
-      if (this.currentMode === 'txt2video' || this.currentMode === 'img2video') {
-        const frames = this.generationOptions.frames || 49
-        const pricing = videoCredits[model] || videoCredits['Ltx2_3_22B_Dist_INT8']
-        
-        // Find best match
-        let bestMatch = 20
-        for (const [key, credits] of Object.entries(pricing)) {
-          const [w, h, f] = key.split('x').map(Number)
-          if (width <= w && height <= h && frames <= f) {
-            if (credits < bestMatch) bestMatch = credits
-          }
-        }
-        return bestMatch
-      } else if (this.currentMode === 'imgedit') {
-        const pricing = img2imgCredits[model] || img2imgCredits['QwenImageEdit_Plus_NF4']
-        for (const [dim, credits] of Object.entries(pricing)) {
-          if (maxDim <= parseInt(dim)) return credits
-        }
-        return 100
-      } else {
-        // text2img
-        const pricing = txt2imgCredits[model] || txt2imgCredits['Flux_2_Klein_4B_BF16']
-        for (const [dim, credits] of Object.entries(pricing)) {
-          if (maxDim <= parseInt(dim)) return credits
-        }
-        return 15
-      }
-    }
   },
   watch: {
     currentMode(mode) {
@@ -522,42 +261,9 @@ export default {
     }
   },
   mounted() {
-    this.loadCachedBalance()
     this.loadSavedApiKey()
   },
   methods: {
-    loadCachedBalance() {
-      // Use cached balance if available and less than 5 minutes old
-      const cached = localStorage.getItem('videlo_balance')
-      if (cached) {
-        try {
-          const { balance, timestamp } = JSON.parse(cached)
-          const age = Date.now() - timestamp
-          if (age < 5 * 60 * 1000) { // 5 minutes
-            this.balance = balance
-            return
-          }
-        } catch (e) {}
-      }
-      this.fetchBalance()
-    },
-    async fetchBalance() {
-      try {
-        const response = await api.getBalance()
-        this.balance = response.balance
-        // Cache for 5 minutes
-        localStorage.setItem('videlo_balance', JSON.stringify({
-          balance: response.balance,
-          timestamp: Date.now()
-        }))
-      } catch (error) {
-        console.error('Failed to fetch balance:', error)
-      }
-    },
-    setAspectPreset(preset) {
-      this.generationOptions.width = preset.width
-      this.generationOptions.height = preset.height
-    },
     updateOptions(options) {
       this.generationOptions = { ...this.generationOptions, ...options }
     },
@@ -616,6 +322,12 @@ body {
 #app {
   height: 100vh;
   overflow: hidden;
+}
+
+select option,
+select optgroup {
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
 }
 
 /* App Layout */
@@ -710,33 +422,6 @@ body {
   color: var(--text-primary);
 }
 
-.sidebar-footer {
-  padding: 16px;
-  border-top: 1px solid var(--border-color);
-}
-
-.api-balance {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  background: var(--bg-elevated);
-  border-radius: 8px;
-}
-
-.balance-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.balance-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-}
-
 /* Main Content */
 .main-content {
   flex: 1;
@@ -824,324 +509,6 @@ body {
   overflow: hidden;
 }
 
-/* Right Settings Panel */
-.settings-panel {
-  width: 280px;
-  background: var(--bg-panel);
-  border-left: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.settings-tabs {
-  display: flex;
-  padding: 4px;
-  margin: 12px;
-  background: var(--bg-elevated);
-  border-radius: 8px;
-}
-
-.tab {
-  flex: 1;
-  padding: 8px 16px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.tab:hover {
-  color: var(--text-secondary);
-}
-
-.tab.active {
-  background: var(--bg-panel);
-  color: var(--text-primary);
-}
-
-.settings-form {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-}
-
-.setting-group {
-  margin-bottom: 20px;
-}
-
-.setting-group label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.setting-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.setting-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-}
-
-.setting-select {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A3A3A3' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 36px;
-}
-
-.setting-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.setting-input {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-}
-
-.setting-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.setting-input::placeholder {
-  color: var(--text-muted);
-}
-
-/* Dimension Inputs */
-.dimension-inputs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.dim-input {
-  flex: 1;
-  position: relative;
-}
-
-.dim-input input {
-  width: 100%;
-  padding: 10px 12px;
-  padding-right: 32px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-}
-
-.dim-input input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.dim-input span {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.aspect-presets {
-  display: flex;
-  gap: 6px;
-}
-
-.preset-btn {
-  flex: 1;
-  padding: 6px 8px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.preset-btn:hover {
-  border-color: var(--border-hover);
-  color: var(--text-secondary);
-}
-
-.preset-btn.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #000;
-}
-
-/* Slider */
-.setting-slider {
-  width: 100%;
-  height: 4px;
-  background: var(--bg-elevated);
-  border-radius: 2px;
-  appearance: none;
-  cursor: pointer;
-}
-
-.setting-slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
-}
-
-.setting-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-}
-
-.slider-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 6px;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-}
-
-.steps-fixed {
-  padding: 8px 0;
-}
-
-.fixed-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* Seed Input */
-.seed-input-wrapper {
-  display: flex;
-  gap: 8px;
-}
-
-.seed-input-wrapper input {
-  flex: 1;
-}
-
-.seed-random-btn {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--accent-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.seed-random-btn:hover {
-  background: var(--bg-elevated);
-  border-color: var(--accent-secondary);
-}
-
-.seed-random-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.setting-divider {
-  height: 1px;
-  background: var(--border-color);
-  margin: 20px 0;
-}
-
-/* Credit Estimate */
-.credit-estimate {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
-  border: 1px solid rgba(34, 197, 94, 0.2);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.credit-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.credit-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.credit-icon {
-  width: 18px;
-  height: 18px;
-  color: #22C55E;
-}
-
-.credit-value {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #22C55E;
-}
-
-.credit-hint {
-  margin: 10px 0 0;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-/* JSON Tab */
-.settings-json {
-  flex: 1;
-  padding: 16px;
-  overflow: auto;
-}
-
-.settings-json pre {
-  font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -1163,9 +530,6 @@ body {
 
 /* Responsive */
 @media (max-width: 1200px) {
-  .settings-panel {
-    width: 260px;
-  }
 }
 
 @media (max-width: 900px) {
@@ -1183,10 +547,6 @@ body {
   .nav-item {
     justify-content: center;
     padding: 12px;
-  }
-  
-  .settings-panel {
-    display: none;
   }
 }
 

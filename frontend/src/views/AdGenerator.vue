@@ -1,1625 +1,1663 @@
 <template>
-  <div class="ad-generator">
-    <div class="generation-view">
-      <!-- Preview Area -->
-      <div class="preview-area">
-        <!-- No campaign: empty state -->
-        <div v-if="!campaign" class="preview-placeholder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <path d="M10 9l5 3-5 3V9z"/>
-            <circle cx="17" cy="7" r="2"/>
-            <path d="M17 7l2-2"/>
-          </svg>
-          <p>{{ $t('ads.yourAdCampaignWillAppear') }}</p>
+  <div class="ads-page">
+    <!-- Header -->
+    <header class="page-header">
+      <div class="header-content">
+        <h1>{{ $t('ads.generateAd') }}</h1>
+        <p class="header-subtitle">{{ $t('ads.subtitle') }}</p>
+      </div>
+      <button class="campaigns-toggle" @click="showCampaigns = !showCampaigns">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+        </svg>
+        <span>{{ $t('ads.myCampaigns') }}</span>
+        <span class="campaign-count">{{ campaigns.length }}</span>
+      </button>
+    </header>
+
+    <!-- Step Progress -->
+    <div class="step-progress">
+      <div class="progress-track">
+        <div class="progress-fill" :style="{ width: progressWidth }"></div>
+      </div>
+      <div class="step-indicators">
+        <button
+          v-for="(step, index) in steps"
+          :key="step.id"
+          class="step-indicator"
+          :class="{
+            active: currentStep === index,
+            completed: isStepCompleted(index),
+            clickable: canGoToStep(index)
+          }"
+          @click="goToStep(index)"
+        >
+          <span class="step-number">
+            <svg v-if="isStepCompleted(index)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M5 13l4 4L19 7"/>
+            </svg>
+            <span v-else>{{ index + 1 }}</span>
+          </span>
+          <span class="step-label">{{ step.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Step 1: Brief -->
+      <div v-if="currentStep === 0" class="step-panel">
+        <div class="step-header">
+          <h2>{{ $t('ads.campaignBrief') }}</h2>
         </div>
+        <div class="step-body">
+          <div class="form-group">
+            <label>{{ $t('ads.brandName') }}</label>
+            <input v-model="form.brandName" type="text" :placeholder="$t('ads.brandNamePlaceholder')" />
+          </div>
+          <div class="form-group">
+            <label>{{ $t('ads.brandDescription') }}</label>
+            <textarea v-model="form.brandDescription" rows="2" :placeholder="$t('ads.brandDescriptionPlaceholder')"></textarea>
+          </div>
+          <div class="form-group">
+            <label>{{ $t('ads.campaignBrief') }}</label>
+            <textarea
+              v-model="form.prompt"
+              rows="5"
+              :placeholder="$t('ads.describeAdConcept')"
+            ></textarea>
+          </div>
+          <div class="form-tips">
+            <p><strong>Tip:</strong> Describe your product, target audience, key message, and desired tone for best results.</p>
+          </div>
+        </div>
+        <div class="step-actions">
+          <button
+            class="btn-primary generate"
+            :disabled="isGenerating || !form.prompt.trim()"
+            @click="createAndGenerateCampaign"
+          >
+            <svg v-if="isGenerating" class="spinner" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="31.4 31.4" transform="rotate(-90 12 12)"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            {{ isGenerating ? $t('ads.generating') : $t('ads.generateEverything') }}
+          </button>
+        </div>
+      </div>
 
-        <!-- Campaign in progress -->
-        <div v-else class="pipeline-preview">
-          <!-- Phase Progress -->
-          <div class="phase-progress">
-            <div 
-              v-for="phase in phases" 
-              :key="phase.id"
-              class="phase-step"
-              :class="getPhaseClass(phase.id)"
-              @click="canNavigateToPhase(phase.id) && redoFromPhase(phase.id)"
+      <!-- Step 2: Scripts -->
+      <div v-if="currentStep === 1" class="step-panel">
+        <div class="step-header">
+          <h2>{{ $t('ads.generatedScripts') }}</h2>
+          <span class="badge">{{ campaignDetail?.scripts?.length || 0 }}</span>
+        </div>
+        <div class="step-body">
+          <div v-if="!campaignDetail?.scripts?.length" class="empty-state">
+            <p>{{ $t('ads.noScriptsYet') }}</p>
+            <p class="empty-hint">{{ $t('ads.completeBriefFirst') }}</p>
+          </div>
+          <div v-else class="scripts-list">
+            <div
+              v-for="(script, index) in campaignDetail.scripts"
+              :key="script.id"
+              class="script-card"
+              :class="{ expanded: expandedScript === script.id }"
             >
-              <div class="phase-icon">
-                <svg v-if="campaign.current_phase > phase.id || (campaign.current_phase === phase.id && campaign.phase_status === 'completed')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
+              <div class="script-header" @click="toggleScript(script.id)">
+                <div class="script-meta">
+                  <span class="script-number">#{{ index + 1 }}</span>
+                  <span class="script-hook">{{ truncateText(script.hook, 60) }}</span>
+                </div>
+                <svg class="expand-icon" :class="{ rotated: expandedScript === script.id }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 5l7 7-7 7"/>
                 </svg>
-                <span v-else>{{ phase.id }}</span>
               </div>
-              <span class="phase-label">{{ $t(phase.labelKey) }}</span>
-              <button 
-                v-if="canNavigateToPhase(phase.id) && campaign.current_phase !== phase.id" 
-                class="phase-redo-btn"
-                @click.stop="redoFromPhase(phase.id)"
-                :title="'Redo from Phase ' + phase.id"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 4v6h6"/>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Phase Content -->
-          <div class="phase-content-area">
-            <!-- Phase 1: Clarification Questions -->
-            <div v-if="campaign.current_phase === 1 && questions.length > 0" class="phase-content questions">
-              <h3>{{ $t('ads.helpUsUnderstand') }}</h3>
-              <div class="questions-list">
-                <div v-for="(q, idx) in questions" :key="q.id" class="question-item">
-                  <label>{{ q.question }}</label>
-                  <input 
-                    v-if="q.type === 'text'" 
-                    v-model="answers[q.id]" 
-                    type="text" 
-                    class="answer-input"
-                    :placeholder="$t('ads.typeAnswer')"
-                  />
-                  <select v-else-if="q.type === 'select'" v-model="answers[q.id]" class="answer-select">
-                    <option value="">{{ $t('ads.selectOption') }}</option>
-                    <option v-for="opt in q.options" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
+              <div v-if="expandedScript === script.id" class="script-body">
+                <div class="script-section">
+                  <span class="script-label">{{ $t('ads.hook') }}</span>
+                  <p>{{ script.hook }}</p>
                 </div>
-              </div>
-              <button @click="submitAnswers" class="submit-answers-btn" :disabled="!hasAllAnswers">
-                {{ $t('ads.continue') }}
-              </button>
-            </div>
-
-            <!-- Processing State -->
-            <div v-else-if="campaign.phase_status === 'processing'" class="phase-content processing">
-              <div class="spinner-large"></div>
-              <p>{{ getProcessingMessage() }}</p>
-            </div>
-
-            <!-- Phase 3: Ad Strategy -->
-            <div v-else-if="campaign.current_phase === 3 && campaign.ad_angles?.length" class="phase-content strategy">
-              <h3>{{ $t('ads.adStrategy') }}</h3>
-              <div class="angles-grid">
-                <div v-for="angle in campaign.ad_angles" :key="angle.id" class="angle-card">
-                  <div class="angle-header">
-                    <span class="angle-id">#{{ angle.id }}</span>
-                    <span class="angle-hook">{{ angle.hook_idea }}</span>
-                  </div>
-                  <p class="angle-emotion">{{ angle.emotional_trigger }}</p>
-                  <p class="angle-why">{{ angle.why_convert }}</p>
+                <div class="script-section">
+                  <span class="script-label">{{ $t('ads.cta') }}</span>
+                  <p>{{ script.cta }}</p>
                 </div>
-              </div>
-              <button @click="generateScripts" class="action-btn">
-                {{ $t('ads.generateScripts') }}
-              </button>
-            </div>
-
-            <!-- Phase 4+: Generated Content -->
-            <div v-else-if="campaign.current_phase >= 4 || (campaign.scripts_status === 'completed' && scripts.length > 0)" class="phase-content generated">
-              <!-- Scripts -->
-              <div v-if="scripts.length > 0" class="scripts-section">
-                <h3>{{ $t('ads.generatedScripts') }}</h3>
-                <div class="scripts-tabs">
-                  <button 
-                    v-for="script in scripts" 
-                    :key="script.id"
-                    :class="['script-tab', { active: selectedScriptId === script.id }]"
-                    @click="selectedScriptId = script.id"
-                  >
-                    Script {{ script.id }}
-                  </button>
-                </div>
-                <div v-if="selectedScript" class="script-content">
-                  <div class="script-hook">
-                    <label>{{ $t('ads.hook') }}</label>
-                    <p>"{{ selectedScript.hook }}"</p>
-                  </div>
-                  <div class="script-scenes">
-                    <div v-for="scene in selectedScript.scenes" :key="scene.scene" class="scene-item">
-                      <span class="scene-num">{{ $t('ads.scene') }} {{ scene.scene }}</span>
-                      <p class="scene-dialogue">{{ scene.dialogue }}</p>
-                      <p class="scene-visual">{{ scene.visual }}</p>
-                      <span class="scene-duration">{{ scene.duration }}</span>
-                    </div>
-                  </div>
-                  <div class="script-cta">
-                    <label>{{ $t('ads.cta') }}</label>
-                    <p>"{{ selectedScript.cta }}"</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Avatars -->
-              <div v-if="avatars.length > 0" class="avatars-section">
-                <h3>{{ $t('ads.generatedAvatars') }}</h3>
-                <div class="avatars-grid">
-                  <div v-for="avatar in avatars" :key="avatar.id" class="avatar-card">
-                    <div class="avatar-name">{{ avatar.name }}</div>
-                    <div class="avatar-details">
-                      <span>{{ avatar.age }}y, {{ avatar.gender }}</span>
-                      <span>{{ avatar.region }}</span>
-                    </div>
-                    <p class="avatar-appearance">{{ avatar.appearance }}</p>
-                    <p class="avatar-vibe">{{ avatar.personality_vibe }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Continue Button -->
-              <button v-if="campaign.current_phase < 9" @click="continueGeneration" class="action-btn">
-                {{ getNextPhaseButton() }}
-              </button>
-
-              <!-- Completed -->
-              <div v-if="campaign.overall_status === 'completed'" class="completed-section">
-                <div class="completed-header">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                    <polyline points="22 4 12 14.01 9 11.01"/>
-                  </svg>
-                  <h3>{{ $t('ads.campaignComplete') }}</h3>
-                </div>
-                <button @click="resetCampaign" class="new-campaign-btn">
-                  {{ $t('ads.newCampaign') }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Error State -->
-            <div v-else-if="campaign.error_message" class="phase-content error">
-              <div class="error-message">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <span>{{ campaign.error_message }}</span>
-              </div>
-              <button @click="resetCampaign" class="action-btn">{{ $t('ads.tryAgain') }}</button>
-            </div>
-          </div>
-
-          <!-- Debug Logs Panel -->
-          <div v-if="showDebugLogs && campaign" class="debug-panel">
-            <div class="debug-header">
-              <h4>Debug Logs</h4>
-              <button @click="loadDebugLogs" class="debug-refresh-btn" title="Refresh logs">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 4v6h6"/>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                </svg>
-              </button>
-            </div>
-            <div class="debug-logs">
-              <div v-if="debugLogs.length === 0" class="debug-empty">No logs yet</div>
-              <div v-for="(log, idx) in debugLogs" :key="idx" class="debug-log-item" :class="log.status">
-                <span class="log-time">{{ formatLogTime(log.timestamp) }}</span>
-                <span class="log-phase">{{ log.phase }}</span>
-                <span class="log-status">{{ log.status }}</span>
-                <span class="log-data">{{ log.data?.error || log.data?.elapsed_ms + 'ms' || '' }}</span>
               </div>
             </div>
           </div>
-
-          <!-- Debug Toggle Button -->
-          <button v-if="campaign" @click="showDebugLogs = !showDebugLogs" class="debug-toggle-btn" :class="{ active: showDebugLogs }">
+        </div>
+        <div class="step-actions">
+          <button class="btn-secondary" @click="goToStep(0)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
-              <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
-              <circle cx="12" cy="12" r="2"/>
+              <path d="M15 19l-7-7 7-7"/>
+            </svg>
+            {{ $t('common.back') }}
+          </button>
+          <button
+            class="btn-primary"
+            :disabled="!campaignDetail?.scripts?.length"
+            @click="goToStep(2)"
+          >
+            {{ $t('common.next') }}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 5l7 7-7 7"/>
             </svg>
           </button>
         </div>
       </div>
 
-      <!-- Prompt Area -->
-      <div v-if="!campaign" class="prompt-area">
-        <div class="prompt-wrapper">
-          <textarea
-            v-model="userPrompt"
-            :placeholder="promptPlaceholder"
-            rows="3"
-            class="prompt-input"
-            @keydown.ctrl.enter="startCampaign"
-          ></textarea>
-          <div class="prompt-footer">
-            <div class="prompt-actions">
-              <input
-                v-model="brandName"
-                type="text"
-                :placeholder="$t('ads.brandName')"
-                class="brand-input"
-              />
-            </div>
-            <div class="generate-btn-wrapper">
-              <button
-                @click="campaign ? resetCampaign() : startCampaign()"
-                :disabled="!userPrompt.trim() && !campaign"
-                class="generate-btn"
-              >
-                <span v-if="creating" class="btn-content">
-                  <span class="spinner"></span>
-                  <span>{{ $t('ads.starting') }}</span>
-                </span>
-                <span v-else-if="campaign" class="btn-content">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="19" y1="12" x2="5" y2="12"/>
-                    <polyline points="12 19 5 12 12 5"/>
+      <!-- Step 3: Scenes & Assets -->
+      <div v-if="currentStep === 2" class="step-panel">
+        <div class="step-header">
+          <h2>{{ $t('ads.sceneAssets') }}</h2>
+          <div class="header-actions">
+            <button
+              class="btn-small"
+              :disabled="busyImages"
+              @click="generateSceneImages"
+            >
+              {{ busyImages ? $t('ads.generating') : $t('ads.generateImages') }}
+            </button>
+            <button
+              class="btn-small"
+              :disabled="busyVideos"
+              @click="generateSceneVideos"
+            >
+              {{ busyVideos ? $t('ads.generating') : $t('ads.generateVideos') }}
+            </button>
+          </div>
+        </div>
+        
+        <div class="step-body">
+          <div v-if="!allScenes.length" class="empty-state">
+            <p>{{ $t('ads.noScenesYet') }}</p>
+          </div>
+          <div v-else class="scenes-grid">
+            <div
+              v-for="scene in allScenes"
+              :key="scene.id"
+              class="scene-card"
+            >
+              <div class="scene-preview">
+                <img v-if="scene.image_url" :src="scene.image_url" alt="" @click="openPreview(scene)" />
+                <div v-else class="preview-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 21"/>
                   </svg>
-                  <span>{{ $t('ads.newCampaign') }}</span>
-                </span>
-                <span v-else class="btn-content">
+                </div>
+                <div class="scene-badges">
+                  <StatusBadge :status="scene.image_status || 'pending'" class="compact" />
+                  <StatusBadge :status="scene.video_status || 'pending'" class="compact" />
+                </div>
+              </div>
+              <div class="scene-info">
+                <span class="scene-number">{{ $t('ads.scene') }} {{ scene.scene_num }}</span>
+                <p class="scene-prompt">{{ truncateText(scene.image_prompt, 80) }}</p>
+              </div>
+              <div class="scene-actions">
+                <button
+                  class="btn-icon"
+                  :disabled="busySceneId === `image-${scene.id}`"
+                  @click="regenerateSceneImage(scene)"
+                  :title="$t('ads.regenerateImage')"
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                   </svg>
-                  <span>{{ $t('ads.generateAd') }}</span>
-                </span>
-              </button>
-              <div class="credit-badge" v-if="!campaign">
-                <svg class="credit-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
-                </svg>
-                <span>{{ adCredits }}</span>
+                </button>
+                <button
+                  class="btn-icon"
+                  :disabled="busySceneId === `video-${scene.id}` || !scene.image_url"
+                  @click="regenerateSceneVideo(scene)"
+                  :title="$t('ads.regenerateVideo')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                </button>
+                <a
+                  v-if="scene.video_url"
+                  :href="scene.video_url"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn-icon"
+                  :title="$t('ads.downloadVideo')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </a>
               </div>
             </div>
           </div>
         </div>
+        
+        <div class="step-actions">
+          <button class="btn-secondary" @click="goToStep(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 19l-7-7 7-7"/>
+            </svg>
+            {{ $t('common.back') }}
+          </button>
+        </div>
       </div>
 
-      <!-- Recent Campaigns -->
-      <div v-if="previousCampaigns.length > 0 && !campaign" class="recent-section">
-        <h3>{{ $t('ads.previousCampaigns') }}</h3>
-        <div class="recent-grid">
-          <div
-            v-for="camp in previousCampaigns.slice(0, 4)"
-            :key="camp.id"
-            class="recent-card"
-            @click="loadCampaign(camp.id)"
-          >
-            <div class="card-status" :class="camp.overall_status"></div>
-            <div class="card-placeholder">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                <path d="M10 9l5 3-5 3V9z"/>
-              </svg>
+      <!-- Status Message -->
+      <div v-if="statusMessage" class="status-toast" :class="{ error: statusError, success: statusTone === 'success' }">
+        <p>{{ statusMessage }}</p>
+        <button class="toast-close" @click="clearStatus">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </main>
+
+    <!-- Campaigns Drawer -->
+    <Teleport to="body">
+      <Transition name="drawer">
+        <div v-if="showCampaigns" class="drawer-overlay" @click.self="showCampaigns = false">
+          <div class="campaigns-drawer">
+            <div class="drawer-header">
+              <h2>{{ $t('ads.myCampaigns') }}</h2>
+              <button class="drawer-close" @click="showCampaigns = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
             </div>
-            <div class="card-info">
-              <span class="card-brand">{{ camp.brand_name || $t('ads.noBrand') }}</span>
-              <span class="card-prompt">{{ camp.user_prompt?.substring(0, 40) }}...</span>
+            <div class="drawer-body">
+              <div v-if="loadingCampaigns" class="drawer-loading">
+                <div class="spinner"></div>
+              </div>
+              <div v-else-if="!campaigns.length" class="drawer-empty">
+                <p>{{ $t('ads.noCampaigns') }}</p>
+              </div>
+              <div v-else class="campaigns-list">
+                <div
+                  v-for="campaign in campaigns"
+                  :key="campaign.id"
+                  class="campaign-card"
+                  :class="{ active: campaign.id === activeCampaignId }"
+                  @click="selectCampaign(campaign.id)"
+                >
+                  <div class="campaign-preview">
+                    <img v-if="getFirstSceneImage(campaign)" :src="getFirstSceneImage(campaign)" alt="" />
+                    <div v-else class="preview-placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <path d="M21 15l-5-5L5 21"/>
+                      </svg>
+                    </div>
+                    <StatusBadge :status="campaign.overall_status || 'pending'" class="campaign-status" />
+                  </div>
+                  <div class="campaign-info">
+                    <span class="campaign-name">{{ getCampaignTitle(campaign) }}</span>
+                    <span class="campaign-date">{{ formatDate(campaign.created_at) }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Preview Modal -->
+    <Teleport to="body">
+      <div v-if="previewScene" class="modal-overlay" @click.self="previewScene = null">
+        <div class="preview-modal">
+          <button class="modal-close" @click="previewScene = null">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <div class="preview-content">
+            <video v-if="previewScene.video_url" :src="previewScene.video_url" controls autoplay></video>
+            <img v-else-if="previewScene.image_url" :src="previewScene.image_url" alt="" />
+          </div>
+          <div class="preview-actions">
+            <a v-if="previewScene.video_url" :href="previewScene.video_url" target="_blank" class="btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              {{ $t('ads.downloadVideo') }}
+            </a>
+            <a v-else-if="previewScene.image_url" :href="previewScene.image_url" target="_blank" class="btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              {{ $t('ads.downloadImage') }}
+            </a>
+          </div>
+        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
 <script>
 import { useI18n } from 'vue-i18n'
 import api from '../services/api.js'
+import StatusBadge from '../components/StatusBadge.vue'
 
 export default {
   name: 'AdGenerator',
-  props: {
-    generationOptions: {
-      type: Object,
-      default: () => ({})
-    }
-  },
+  components: { StatusBadge },
   setup() {
     const { t } = useI18n()
     return { t }
   },
   data() {
     return {
-      userPrompt: '',
-      brandName: '',
-      brandDescription: '',
-      creating: false,
-      campaign: null,
-      pollingInterval: null,
-      previousCampaigns: [],
-      questions: [],
-      answers: {},
-      scripts: [],
-      avatars: [],
-      selectedScriptId: 1,
-      showDebugLogs: false,
-      debugLogs: [],
-      redoingPhase: null,
-      phases: [
-        { id: 1, labelKey: 'ads.phaseAsk' },
-        { id: 2, labelKey: 'ads.phaseContext' },
-        { id: 3, labelKey: 'ads.phaseStrategy' },
-        { id: 4, labelKey: 'ads.phaseScripts' },
-        { id: 5, labelKey: 'ads.phaseAvatars' },
-        { id: 6, labelKey: 'ads.phaseStoryboard' },
-        { id: 7, labelKey: 'ads.phaseImages' },
-        { id: 8, labelKey: 'ads.phaseVideos' },
-        { id: 9, labelKey: 'ads.phaseComplete' }
-      ]
+      currentStep: 0,
+      showCampaigns: false,
+      expandedScript: null,
+      previewScene: null,
+      pollInterval: null,
+      form: {
+        prompt: '',
+        brandName: '',
+        brandDescription: ''
+      },
+      steps: [
+        { id: 'brief', label: 'Brief' },
+        { id: 'scripts', label: 'Scripts' },
+        { id: 'scenes', label: 'Scenes' }
+      ],
+      campaigns: [],
+      activeCampaignId: null,
+      campaignDetail: null,
+      loadingCampaigns: false,
+      isGenerating: false,
+      busyImages: false,
+      busyVideos: false,
+      busySceneId: null,
+      statusMessage: '',
+      statusError: '',
+      statusTone: 'neutral'
     }
   },
   computed: {
-    promptPlaceholder() {
-      return this.t('ads.describeAdConcept')
+    progressWidth() {
+      // Progress advances as user moves through steps
+      // On step 0: 0%, On step 1: 33%, On step 2: 66%, After generate: 100%
+      const hasResults = this.allScenes.some(s => s.image_url || s.video_url)
+      if (hasResults) {
+        return '100%'
+      }
+      return `${(this.currentStep / this.steps.length) * 100}%`
     },
-    adCredits() {
-      return 30
+    allScenes() {
+      if (!this.campaignDetail?.storyboards) return []
+      return this.campaignDetail.storyboards.flatMap(storyboard => storyboard.scene_prompts || [])
     },
-    hasAllAnswers() {
-      if (this.questions.length === 0) return false
-      return this.questions.every(q => this.answers[q.id]?.trim())
-    },
-    selectedScript() {
-      return this.scripts.find(s => s.id === this.selectedScriptId) || this.scripts[0]
+    hasProcessingScenes() {
+      return this.allScenes.some(s => s.image_status === 'processing' || s.video_status === 'processing')
     }
   },
   mounted() {
-    this.loadPreviousCampaigns()
+    this.loadCampaigns()
   },
   beforeUnmount() {
     this.stopPolling()
   },
   methods: {
-    async loadPreviousCampaigns() {
+    isStepCompleted(index) {
+      if (!this.campaignDetail) return false
+      if (index === 0) return !!this.campaignDetail.user_prompt
+      if (index === 1) return this.campaignDetail.scripts?.length > 0
+      if (index === 2) return this.allScenes.some(s => s.image_url || s.video_url)
+      return false
+    },
+    canGoToStep(index) {
+      return true
+    },
+    goToStep(index) {
+      this.currentStep = index
+    },
+    toggleScript(scriptId) {
+      this.expandedScript = this.expandedScript === scriptId ? null : scriptId
+    },
+    truncateText(text, maxLength) {
+      if (!text) return ''
+      return text.length > maxLength ? text.slice(0, maxLength) + '...' : text
+    },
+    formatDate(date) {
+      if (!date) return ''
+      return new Date(date).toLocaleDateString()
+    },
+    openPreview(scene) {
+      this.previewScene = scene
+    },
+    clearStatus() {
+      this.statusMessage = ''
+      this.statusError = ''
+    },
+    getFirstSceneImage(campaign) {
+      // Campaigns in list don't have storyboards loaded, return null
+      // The detail view will have the actual scene images
+      return null
+    },
+
+    async loadCampaigns() {
+      this.loadingCampaigns = true
       try {
-        const response = await api.getAdCampaigns(1, 6)
-        this.previousCampaigns = response.items || []
+        const response = await api.getAdCampaigns(1, 20)
+        this.campaigns = response.items || []
       } catch (error) {
         console.error('Failed to load campaigns:', error)
+      } finally {
+        this.loadingCampaigns = false
       }
     },
 
-    async startCampaign() {
-      if (!this.userPrompt.trim() || this.creating) return
+    async selectCampaign(campaignId) {
+      this.activeCampaignId = campaignId
+      this.showCampaigns = false
+      this.statusMessage = ''
+      this.statusError = ''
       
-      // Validate minimum length
-      if (this.userPrompt.trim().length < 5) {
-        alert(this.t('ads.promptTooShort') || 'Please enter at least 5 characters for your ad concept')
-        return
-      }
-
-      this.creating = true
       try {
-        const result = await api.createAdCampaign({
-          user_prompt: this.userPrompt,
-          brand_name: this.brandName || null,
-          brand_description: this.brandDescription || null
-        })
+        await this.loadCampaignDetail(campaignId)
         
-        console.log('Create campaign result:', result)
-        
-        // Check if campaign creation failed (LLM error)
-        if (result.phase_status === 'failed' || result.error_message) {
-          alert(result.error_message || this.t('ads.failedToStartCampaign'))
-          this.campaign = result // Still show the campaign with error state
-          this.creating = false
+        // Go to appropriate step based on campaign progress
+        if (!this.campaignDetail) {
+          this.currentStep = 0
           return
         }
         
-        this.campaign = result
-        
-        // Phase 1: Show clarification questions
-        if (result.clarification_questions?.length > 0) {
-          this.questions = result.clarification_questions
-          this.answers = {}
-        } else if (result.phase_status === 'processing') {
-          this.startPolling()
+        // If campaign has storyboards with scene prompts, go to step 2 (scenes)
+        if (this.campaignDetail.storyboards?.length > 0) {
+          this.currentStep = 2
         }
-        
-        // Load debug logs (non-blocking)
-        this.loadDebugLogs().catch(e => console.error('Failed to load debug logs:', e))
-
-      } catch (error) {
-        console.error('Failed to start campaign:', error)
-        // Extract error message from response
-        let errorMsg = this.t('ads.failedToStartCampaign')
-        if (error.response?.data?.detail) {
-          const detail = error.response.data.detail
-          if (Array.isArray(detail)) {
-            // Validation errors
-            errorMsg = detail.map(e => e.msg).join(', ')
-          } else if (typeof detail === 'string') {
-            errorMsg = detail
+        // If campaign has scripts, go to step 1 (scripts)
+        else if (this.campaignDetail.scripts?.length > 0) {
+          this.currentStep = 1
+        }
+        // Otherwise stay at step 0 (brief)
+        else {
+          this.currentStep = 0
+          // Pre-fill form if campaign has user_prompt
+          if (this.campaignDetail.user_prompt) {
+            this.form.prompt = this.campaignDetail.user_prompt
           }
-        } else if (error.message) {
-          errorMsg = error.message
+          if (this.campaignDetail.context?.brand) {
+            this.form.brandName = this.campaignDetail.context.brand
+          }
         }
-        alert(errorMsg)
-      } finally {
-        this.creating = false
+      } catch (error) {
+        console.error('Failed to select campaign:', error)
+        this.statusMessage = this.t('ads.failedToLoadCampaign')
+        this.statusError = true
       }
     },
 
-    async loadCampaign(campaignId) {
+    async loadCampaignDetail(campaignId = this.activeCampaignId) {
+      if (!campaignId) return
       try {
-        this.campaign = await api.getAdCampaign(campaignId)
-        if (this.campaign.clarification_questions?.length > 0 && !this.campaign.user_answers) {
-          this.questions = this.campaign.clarification_questions
+        // First fetch the campaign details
+        this.campaignDetail = await api.getAdCampaignDetail(campaignId)
+        
+        // Only check status if campaign has scene prompts that are processing
+        if (this.hasProcessingScenes) {
+          try {
+            await api.checkAdCampaignStatus(campaignId)
+            // Refresh after status check
+            this.campaignDetail = await api.getAdCampaignDetail(campaignId)
+          } catch (statusError) {
+            console.warn('Status check failed, using cached data:', statusError)
+          }
         }
-        if (this.campaign.phase_status === 'processing') {
+        
+        // Start polling if still processing
+        if (this.campaignDetail?.overall_status === 'processing') {
           this.startPolling()
+        } else {
+          this.stopPolling()
         }
-        await this.loadCampaignDetails(campaignId)
-        await this.loadDebugLogs()
       } catch (error) {
         console.error('Failed to load campaign:', error)
-      }
-    },
-
-    async loadCampaignDetails(campaignId) {
-      try {
-        const detail = await api.getAdCampaignDetail(campaignId)
-        this.scripts = detail.scripts || []
-        this.avatars = detail.avatars || []
-      } catch (error) {
-        console.error('Failed to load campaign details:', error)
-      }
-    },
-
-    async submitAnswers() {
-      if (!this.hasAllAnswers) return
-
-      this.campaign.phase_status = 'processing'
-      try {
-        const answersList = Object.entries(this.answers).map(([id, answer]) => ({
-          question_id: id,
-          answer
-        }))
-        
-        const result = await api.submitAdCampaignAnswers(this.campaign.id, answersList)
-        console.log('Submit answers result:', result)
-        
-        // Refresh campaign from server to get full state
-        this.campaign = await api.getAdCampaign(this.campaign.id)
-        await this.loadDebugLogs()
-      } catch (error) {
-        console.error('Failed to submit answers:', error)
-        this.campaign.error_message = 'Failed to process answers'
-        this.campaign.phase_status = 'failed'
-      }
-    },
-
-    async generateScripts() {
-      if (!this.campaign || this.campaign.phase_status === 'processing') return
-      
-      this.campaign.phase_status = 'processing'
-      try {
-        const result = await api.generateAdScripts(this.campaign.id, { num_scripts: 5 })
-        console.log('Generate scripts result:', result)
-        this.scripts = result.scripts || []
-        // Refresh campaign state from server
-        this.campaign = await api.getAdCampaign(this.campaign.id)
-        await this.loadDebugLogs()
-      } catch (error) {
-        console.error('Failed to generate scripts:', error)
-        this.campaign.error_message = error.response?.data?.detail || 'Failed to generate scripts'
-        this.campaign.phase_status = 'failed'
-        // Refresh to get the actual error state from server
-        try {
-          this.campaign = await api.getAdCampaign(this.campaign.id)
-        } catch (e) {
-          console.error('Failed to refresh campaign:', e)
-        }
-      }
-    },
-
-    async continueGeneration() {
-      if (!this.campaign || this.campaign.phase_status === 'processing') return
-      
-      this.campaign.phase_status = 'processing'
-      try {
-        // Auto-generate remaining phases
-        const result = await api.generateAllAdCampaign(this.campaign.id)
-        console.log('Generate all result:', result)
-        // Refresh campaign state from server
-        this.campaign = await api.getAdCampaign(this.campaign.id)
-        await this.loadCampaignDetails(this.campaign.id)
-        await this.loadDebugLogs()
-      } catch (error) {
-        console.error('Failed to continue:', error)
-        this.campaign.error_message = error.response?.data?.detail || 'Generation failed'
-        this.campaign.phase_status = 'failed'
-        // Refresh to get the actual error state from server
-        try {
-          this.campaign = await api.getAdCampaign(this.campaign.id)
-        } catch (e) {
-          console.error('Failed to refresh campaign:', e)
-        }
+        this.statusMessage = this.t('ads.failedToLoadCampaign')
+        this.statusError = true
       }
     },
 
     startPolling() {
       this.stopPolling()
-      this.pollingInterval = setInterval(async () => {
+      // Increased from 5s to 15s to reduce API requests
+      this.pollInterval = setInterval(async () => {
+        if (!this.activeCampaignId) return
         try {
-          const updated = await api.getAdCampaign(this.campaign.id)
-          this.campaign = updated
-          
-          if (updated.clarification_questions?.length > 0 && !updated.user_answers) {
-            this.questions = updated.clarification_questions
+          // Check status only if there are processing scenes
+          if (this.hasProcessingScenes) {
+            try {
+              await api.checkAdCampaignStatus(this.activeCampaignId)
+            } catch (e) {
+              console.warn('Status check failed:', e)
+            }
           }
+          // Always refresh details
+          this.campaignDetail = await api.getAdCampaignDetail(this.activeCampaignId)
           
-          if (updated.phase_status !== 'processing') {
+          if (this.campaignDetail?.overall_status !== 'processing') {
             this.stopPolling()
-            await this.loadCampaignDetails(updated.id)
-            await this.loadDebugLogs()
-            this.loadPreviousCampaigns()
           }
         } catch (error) {
           console.error('Polling error:', error)
         }
-      }, 3000)
+      }, 15000)
     },
 
     stopPolling() {
-      if (this.pollingInterval) {
-        clearInterval(this.pollingInterval)
-        this.pollingInterval = null
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval)
+        this.pollInterval = null
       }
     },
 
-    resetCampaign() {
-      this.stopPolling()
-      this.campaign = null
-      this.questions = []
-      this.answers = {}
-      this.scripts = []
-      this.avatars = []
-      this.selectedScriptId = 1
-      this.userPrompt = ''
-      this.brandName = ''
-      this.brandDescription = ''
-      this.loadPreviousCampaigns()
-    },
+    async createAndGenerateCampaign() {
+      if (!this.form.prompt.trim()) return
 
-    getPhaseClass(phaseId) {
-      if (!this.campaign) return 'pending'
-      if (this.campaign.current_phase > phaseId) return 'completed'
-      if (this.campaign.current_phase === phaseId) {
-        return this.campaign.phase_status === 'completed' ? 'completed' : 'active'
-      }
-      return 'pending'
-    },
+      this.isGenerating = true
+      this.statusMessage = this.t('ads.creatingCampaign')
 
-    getProcessingMessage() {
-      const messages = {
-        1: this.t('ads.processingQuestions'),
-        2: this.t('ads.processingContext'),
-        3: this.t('ads.processingStrategy'),
-        4: this.t('ads.processingScripts'),
-        5: this.t('ads.processingAvatars'),
-        6: this.t('ads.processingStoryboard'),
-        7: this.t('ads.processingImages'),
-        8: this.t('ads.processingVideos'),
-        9: this.t('ads.processingComplete')
-      }
-      return messages[this.campaign?.current_phase] || this.t('ads.processing')
-    },
-
-    getNextPhaseButton() {
-      if (this.campaign.current_phase === 3) return this.t('ads.generateScripts')
-      if (this.campaign.current_phase === 4 && this.scripts.length === 0) return this.t('ads.generateScripts')
-      if (this.campaign.current_phase < 9) return this.t('ads.continueGeneration')
-      return this.t('ads.viewResults')
-    },
-
-    // Check if user can navigate to a specific phase
-    canNavigateToPhase(phaseId) {
-      if (!this.campaign) return false
-      // Can only navigate to completed phases or the current phase
-      return this.campaign.current_phase >= phaseId
-    },
-
-    // Redo from a specific phase
-    async redoFromPhase(phaseId) {
-      if (!this.canNavigateToPhase(phaseId)) return
-      if (this.redoingPhase) return // Prevent double-click
-      
-      const confirmMsg = this.t('ads.confirmRedoPhase') || `Redo from Phase ${phaseId}? This will clear all data from this phase onwards.`
-      if (!confirm(confirmMsg)) return
-
-      this.redoingPhase = phaseId
-      this.campaign.phase_status = 'processing'
-      
       try {
-        const result = await api.redoCampaignPhase(this.campaign.id, phaseId)
+        const campaign = await api.createAdCampaign({
+          user_prompt: this.form.prompt.trim(),
+          brand_name: this.form.brandName.trim() || null,
+          brand_description: this.form.brandDescription.trim() || null
+        })
+
+        this.activeCampaignId = campaign.id
+        this.statusMessage = this.t('ads.generatingPipeline')
+
+        await api.generateAllAdCampaign(campaign.id, {
+          numScripts: 5,
+          numAvatars: 3
+        })
+
+        await this.loadCampaigns()
+        await this.loadCampaignDetail(campaign.id)
         
-        // If phase 1 needs answers
-        if (result.status === 'needs_answers') {
-          this.questions = result.questions || []
-          this.answers = {}
-          this.campaign = await api.getAdCampaign(this.campaign.id)
-        } else {
-          this.campaign = await api.getAdCampaign(this.campaign.id)
-          await this.loadCampaignDetails(this.campaign.id)
-        }
+        this.currentStep = 1
+        this.statusMessage = this.t('ads.campaignReady')
+        this.statusTone = 'success'
         
-        // Reload debug logs
-        await this.loadDebugLogs()
+        setTimeout(() => this.clearStatus(), 3000)
       } catch (error) {
-        console.error('Failed to redo phase:', error)
-        this.campaign.error_message = 'Failed to redo phase'
-        this.campaign.phase_status = 'failed'
+        console.error('Failed:', error)
+        this.statusMessage = error?.response?.data?.detail || this.t('ads.failedToGenerateCampaign')
+        this.statusError = true
       } finally {
-        this.redoingPhase = null
+        this.isGenerating = false
       }
     },
 
-    // Load debug logs
-    async loadDebugLogs() {
-      if (!this.campaign) return
+    async generateSceneImages() {
+      if (!this.activeCampaignId) return
+      this.busyImages = true
+      this.statusMessage = this.t('ads.generatingImages')
       try {
-        const result = await api.getAdCampaignDebugLogs(this.campaign.id)
-        this.debugLogs = result.logs || []
+        await api.generateAdCampaignImages(this.activeCampaignId)
+        await this.loadCampaignDetail()
+        this.statusMessage = this.t('ads.imagesReady')
+        this.statusTone = 'success'
+        setTimeout(() => this.clearStatus(), 2000)
       } catch (error) {
-        console.error('Failed to load debug logs:', error)
+        console.error('Failed:', error)
+        this.statusMessage = this.t('ads.failedToGenerateImages')
+        this.statusError = true
+      } finally {
+        this.busyImages = false
       }
     },
 
-    // Format log timestamp
-    formatLogTime(timestamp) {
-      const date = new Date(timestamp * 1000)
-      return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    async generateSceneVideos() {
+      if (!this.activeCampaignId) return
+      this.busyVideos = true
+      this.statusMessage = this.t('ads.generatingVideos')
+      try {
+        await api.generateAdCampaignVideos(this.activeCampaignId)
+        await this.loadCampaignDetail()
+        this.statusMessage = this.t('ads.videosReady')
+        this.statusTone = 'success'
+        setTimeout(() => this.clearStatus(), 2000)
+      } catch (error) {
+        console.error('Failed:', error)
+        this.statusMessage = this.t('ads.failedToGenerateVideos')
+        this.statusError = true
+      } finally {
+        this.busyVideos = false
+      }
+    },
+
+    async regenerateSceneImage(scene) {
+      if (!this.activeCampaignId || !scene?.id) return
+      this.busySceneId = `image-${scene.id}`
+      try {
+        await api.regenerateAdSceneImage(this.activeCampaignId, scene.id, scene.image_prompt)
+        await this.loadCampaignDetail()
+      } catch (error) {
+        console.error('Failed:', error)
+      } finally {
+        this.busySceneId = null
+      }
+    },
+
+    async regenerateSceneVideo(scene) {
+      if (!this.activeCampaignId || !scene?.id) return
+      this.busySceneId = `video-${scene.id}`
+      try {
+        await api.regenerateAdSceneVideo(this.activeCampaignId, scene.id, scene.video_prompt)
+        await this.loadCampaignDetail()
+      } catch (error) {
+        console.error('Failed:', error)
+      } finally {
+        this.busySceneId = null
+      }
+    },
+
+    getCampaignTitle(campaign) {
+      if (!campaign) return this.t('ads.noBrand')
+      if (campaign.brand_name) return campaign.brand_name
+      if (campaign.user_prompt) return campaign.user_prompt.slice(0, 50)
+      return this.t('ads.noBrand')
     }
   }
 }
 </script>
 
 <style scoped>
-.ad-generator {
-  height: 100%;
+.ads-page {
+  min-height: 100%;
+  padding: 24px;
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+  max-width: 900px;
+  margin: 0 auto;
 }
 
-.generation-view {
+/* Header */
+.page-header {
   display: flex;
-  flex-direction: column;
-  gap: 24px;
-  height: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
 }
 
-/* Preview Area */
-.preview-area {
-  flex: 1;
-  min-height: 300px;
+.header-content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.header-subtitle {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.campaigns-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.campaigns-toggle:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+}
+
+.campaigns-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.campaign-count {
+  background: var(--accent-primary);
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Step Progress */
+.step-progress {
+  margin-bottom: 40px;
+}
+
+.progress-track {
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  transition: width 0.3s ease;
+}
+
+.step-indicators {
+  display: flex;
+  justify-content: space-between;
+}
+
+.step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.step-number {
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.step-indicator.active .step-number {
+  background: var(--accent-primary);
+  color: #000;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+
+.step-indicator.completed .step-number {
+  background: var(--accent-secondary);
+  color: #000;
+}
+
+.step-number svg {
+  width: 18px;
+  height: 18px;
+}
+
+.step-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.step-indicator.active .step-label,
+.step-indicator.completed .step-label {
+  color: var(--text-primary);
+}
+
+/* Main Content */
+.main-content {
   position: relative;
 }
 
-.preview-placeholder {
+.step-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 32px;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.step-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.badge {
+  background: var(--accent-primary);
+  color: #000;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.step-body {
+  margin-bottom: 24px;
+}
+
+/* Form Elements */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1rem;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.form-tips {
+  padding: 12px 16px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.form-tips p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Buttons */
+.step-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-primary,
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  border: none;
+  color: #000;
+}
+
+.btn-primary:hover {
+  background: #fbbf24;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+}
+
+.btn-small {
+  padding: 8px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-small:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+}
+
+.btn-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.btn-icon:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #000;
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Scripts */
+.scripts-list {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.script-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.script-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.script-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.script-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.script-number {
+  background: var(--accent-primary);
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.script-hook {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.expand-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.expand-icon.rotated {
+  transform: rotate(90deg);
+}
+
+.script-body {
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.script-section {
+  margin-top: 12px;
+}
+
+.script-label {
+  display: inline-block;
+  padding: 4px 8px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.script-section p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* Scenes Grid */
+.scenes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+}
+
+.scene-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.scene-card:hover {
+  border-color: var(--accent-primary);
+}
+
+.scene-preview {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: var(--bg-elevated);
+  cursor: pointer;
+}
+
+.scene-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
 }
 
 .preview-placeholder svg {
-  width: 64px;
-  height: 64px;
-  opacity: 0.5;
-}
-
-.preview-placeholder p {
-  font-size: 0.875rem;
-}
-
-/* Pipeline Preview */
-.pipeline-preview {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-/* Phase Progress */
-.phase-progress {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.phase-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.phase-step.active {
-  border-color: var(--accent-primary);
-  background: rgba(245, 158, 11, 0.1);
-}
-
-.phase-step.completed {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.05);
-}
-
-.phase-step.completed .phase-icon {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22C55E;
-}
-
-.phase-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-panel);
-  border-radius: 50%;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.phase-step.active .phase-icon {
-  background: var(--accent-primary);
-  color: #000;
-}
-
-.phase-icon svg {
-  width: 12px;
-  height: 12px;
-}
-
-.phase-label {
-  font-size: 0.625rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.phase-step.active .phase-label {
-  color: var(--accent-primary);
-}
-
-.phase-step.completed .phase-label {
-  color: #22C55E;
-}
-
-/* Phase Content Area */
-.phase-content-area {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.phase-content {
-  width: 100%;
-  max-width: 600px;
-  text-align: center;
-}
-
-.phase-content.processing {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.phase-content.processing p {
-  font-size: 0.9375rem;
-  color: var(--text-secondary);
-}
-
-/* Questions Phase */
-.phase-content.questions {
-  text-align: left;
-}
-
-.phase-content.questions h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.questions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.question-item label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-}
-
-.answer-input,
-.answer-select {
-  width: 100%;
-  padding: 12px 14px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-}
-
-.answer-input:focus,
-.answer-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.submit-answers-btn {
-  width: 100%;
-  margin-top: 20px;
-  padding: 14px;
-  background: var(--accent-primary);
-  border: none;
-  border-radius: 10px;
-  color: #000;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.submit-answers-btn:hover:not(:disabled) {
-  background: var(--accent-primary-hover);
-}
-
-.submit-answers-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Strategy Phase */
-.phase-content.strategy {
-  text-align: left;
-}
-
-.phase-content.strategy h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.angles-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.angle-card {
-  padding: 14px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-}
-
-.angle-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.angle-id {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-}
-
-.angle-hook {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.angle-emotion {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-}
-
-.angle-why {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-/* Generated Content Phase */
-.phase-content.generated {
-  text-align: left;
-}
-
-.scripts-section h3,
-.avatars-section h3 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.scripts-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.script-tab {
-  padding: 8px 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.script-tab.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #000;
-}
-
-.script-content {
-  padding: 16px;
-  background: var(--bg-elevated);
-  border-radius: 10px;
-  margin-bottom: 24px;
-}
-
-.script-hook,
-.script-cta {
-  margin-bottom: 16px;
-}
-
-.script-hook label,
-.script-cta label {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
-}
-
-.script-hook p,
-.script-cta p {
-  font-size: 0.9375rem;
-  color: var(--text-primary);
-  font-style: italic;
-}
-
-.script-scenes {
-  margin-bottom: 16px;
-}
-
-.scene-item {
-  padding: 12px;
-  background: var(--bg-panel);
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-
-.scene-num {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.scene-dialogue {
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  margin: 6px 0;
-}
-
-.scene-visual {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-}
-
-.scene-duration {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-}
-
-/* Avatars */
-.avatars-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.avatar-card {
-  padding: 14px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-}
-
-.avatar-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 6px;
-}
-
-.avatar-details {
-  display: flex;
-  gap: 8px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-
-.avatar-appearance {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 6px;
-}
-
-.avatar-vibe {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* Action Button */
-.action-btn {
-  display: block;
-  width: 100%;
-  padding: 14px;
-  background: var(--accent-primary);
-  border: none;
-  border-radius: 10px;
-  color: #000;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-top: 20px;
-}
-
-.action-btn:hover {
-  background: var(--accent-primary-hover);
-}
-
-/* Completed Section */
-.completed-section {
-  text-align: center;
-  padding: 20px;
-}
-
-.completed-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #22C55E;
-  margin-bottom: 20px;
-}
-
-.completed-header svg {
   width: 32px;
   height: 32px;
 }
 
-.completed-header h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.new-campaign-btn {
-  padding: 12px 28px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  color: var(--text-primary);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.new-campaign-btn:hover {
-  border-color: var(--accent-primary);
-}
-
-/* Error State */
-.phase-content.error {
-  text-align: center;
-}
-
-.error-message {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 10px;
-  color: #EF4444;
-  margin-bottom: 16px;
-}
-
-.error-message svg {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-/* Spinner */
-.spinner-large {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border-color);
-  border-top-color: var(--accent-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Prompt Area */
-.prompt-area {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-}
-
-.prompt-wrapper {
-  flex: 1;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.prompt-input {
-  width: 100%;
-  padding: 16px 20px;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  resize: none;
-  font-family: inherit;
-}
-
-.prompt-input:focus {
-  outline: none;
-}
-
-.prompt-input::placeholder {
-  color: var(--text-muted);
-}
-
-.prompt-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid var(--border-color);
-}
-
-.prompt-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.brand-input {
-  padding: 10px 14px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  width: 200px;
-}
-
-.brand-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.brand-input::placeholder {
-  color: var(--text-muted);
-}
-
-.generate-btn-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.credit-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08));
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #22C55E;
-  white-space: nowrap;
-}
-
-.credit-badge .credit-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.generate-btn {
-  padding: 10px 24px;
-  background: var(--accent-primary);
-  border: none;
-  border-radius: 8px;
-  color: #000;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.generate-btn:hover:not(:disabled) {
-  background: var(--accent-primary-hover);
-}
-
-.generate-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.btn-content svg {
-  width: 16px;
-  height: 16px;
-}
-
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  border-top-color: #000;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-/* Recent Section */
-.recent-section {
-  margin-top: auto;
-}
-
-.recent-section h3 {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
-}
-
-.recent-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
-.recent-card {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  transition: all 0.2s ease;
-}
-
-.recent-card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
-}
-
-.card-status {
+.scene-badges {
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  z-index: 1;
+  display: flex;
+  gap: 4px;
 }
 
-.card-status.completed {
-  background: #22C55E;
+.scene-badges .compact {
+  transform: scale(0.8);
 }
 
-.card-status.processing {
-  background: #F59E0B;
+.scene-info {
+  padding: 12px;
 }
 
-.card-status.failed,
-.card-status.needs_revision {
-  background: #EF4444;
+.scene-number {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
-.card-placeholder {
-  width: 100%;
-  height: 100%;
+.scene-prompt {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.scene-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  margin: 0 0 8px;
+}
+
+.empty-hint {
+  font-size: 0.875rem;
+}
+
+/* Status Toast */
+.status-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+.status-toast.error {
+  border-color: #ef4444;
+  background: rgba(127, 29, 29, 0.9);
+}
+
+.status-toast.success {
+  border-color: #22c55e;
+  background: rgba(20, 83, 45, 0.9);
+}
+
+.status-toast p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.toast-close {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elevated);
-}
-
-.card-placeholder svg {
-  width: 32px;
-  height: 32px;
-  color: var(--text-muted);
-  opacity: 0.5;
-}
-
-.card-info {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-}
-
-.card-brand {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
-  margin-bottom: 2px;
-}
-
-.card-prompt {
-  font-size: 0.6875rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-@media (max-width: 900px) {
-  .phase-progress {
-    flex-wrap: wrap;
-  }
-
-  .brand-input {
-    width: 150px;
-  }
-
-  .recent-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* Phase Redo Button */
-.phase-redo-btn {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  padding: 2px;
-  background: var(--accent-primary);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.phase-step:hover .phase-redo-btn {
-  opacity: 1;
-}
-
-.phase-redo-btn svg {
-  width: 10px;
-  height: 10px;
-  color: #000;
-}
-
-.phase-redo-btn:hover {
-  background: var(--accent-primary-hover);
-}
-
-.phase-step {
-  position: relative;
-  cursor: pointer;
-}
-
-/* Debug Panel */
-.debug-panel {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  right: 10px;
-  max-height: 200px;
-  background: rgba(0, 0, 0, 0.9);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow: hidden;
-  font-size: 0.75rem;
-}
-
-.debug-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.debug-header h4 {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.debug-refresh-btn {
-  padding: 4px;
   background: transparent;
   border: none;
-  cursor: pointer;
   color: var(--text-muted);
-  transition: color 0.15s ease;
+  cursor: pointer;
+  border-radius: 6px;
 }
 
-.debug-refresh-btn:hover {
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
 }
 
-.debug-refresh-btn svg {
-  width: 14px;
-  height: 14px;
+.toast-close svg {
+  width: 16px;
+  height: 16px;
 }
 
-.debug-logs {
-  padding: 8px;
-  max-height: 150px;
-  overflow-y: auto;
+/* Campaigns Drawer */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.debug-empty {
-  color: var(--text-muted);
-  text-align: center;
-  padding: 12px;
+.campaigns-drawer {
+  width: 400px;
+  max-width: 100%;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  animation: slide-in 0.3s ease;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.debug-log-item {
+@keyframes slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  margin-bottom: 2px;
-  background: rgba(255, 255, 255, 0.03);
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.debug-log-item.start {
-  border-left: 2px solid #F59E0B;
+.drawer-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
 }
 
-.debug-log-item.complete {
-  border-left: 2px solid #22C55E;
-}
-
-.debug-log-item.error,
-.debug-log-item.exception {
-  border-left: 2px solid #EF4444;
-}
-
-.log-time {
-  color: var(--text-muted);
-  font-family: monospace;
-}
-
-.log-phase {
-  color: var(--text-secondary);
-  flex: 1;
-}
-
-.log-status {
-  text-transform: uppercase;
-  font-size: 0.625rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.debug-log-item.start .log-status {
-  background: rgba(245, 158, 11, 0.2);
-  color: #F59E0B;
-}
-
-.debug-log-item.complete .log-status {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22C55E;
-}
-
-.debug-log-item.error .log-status,
-.debug-log-item.exception .log-status {
-  background: rgba(239, 68, 68, 0.2);
-  color: #EF4444;
-}
-
-.log-data {
-  color: var(--text-muted);
-  font-family: monospace;
-  font-size: 0.6875rem;
-}
-
-/* Debug Toggle Button */
-.debug-toggle-btn {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  padding: 6px;
-  background: var(--bg-elevated);
+.drawer-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 8px;
+  color: var(--text-primary);
   cursor: pointer;
-  color: var(--text-muted);
-  transition: all 0.15s ease;
 }
 
-.debug-toggle-btn:hover,
-.debug-toggle-btn.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #000;
-}
-
-.debug-toggle-btn svg {
+.drawer-close svg {
   width: 18px;
   height: 18px;
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.drawer-loading,
+.drawer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: var(--text-muted);
+}
+
+.campaigns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.campaign-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.campaign-card:hover {
+  border-color: var(--accent-primary);
+}
+
+.campaign-card.active {
+  border-color: var(--accent-primary);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.campaign-preview {
+  position: relative;
+  width: 80px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+
+.campaign-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.campaign-preview .preview-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.campaign-preview .preview-placeholder svg {
+  width: 24px;
+  height: 24px;
+}
+
+.campaign-status {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  transform: scale(0.8);
+}
+
+.campaign-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.campaign-name {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.campaign-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Preview Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.preview-modal {
+  max-width: 90vw;
+  max-height: 90vh;
+  position: relative;
+}
+
+.modal-close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.modal-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.preview-content {
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.preview-content video,
+.preview-content img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* Drawer Transition */
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.drawer-enter-active .campaigns-drawer,
+.drawer-leave-active .campaigns-drawer {
+  transition: transform 0.3s ease;
+}
+
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+}
+
+.drawer-enter-from .campaigns-drawer,
+.drawer-leave-to .campaigns-drawer {
+  transform: translateX(100%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ads-page {
+    padding: 12px;
+  }
+
+  .page-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .header-content h1 {
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+  }
+
+  .header-subtitle {
+    display: none;
+  }
+
+  .campaigns-toggle {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .campaigns-toggle span:not(.campaign-count) {
+    display: none;
+  }
+
+  .step-progress {
+    margin-bottom: 20px;
+  }
+
+  .step-indicators {
+    gap: 0;
+  }
+
+  .step-indicator {
+    flex: 1;
+  }
+
+  .step-number {
+    width: 32px;
+    height: 32px;
+    font-size: 0.875rem;
+  }
+
+  .step-number svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .step-label {
+    display: none;
+  }
+
+  .step-panel {
+    padding: 20px 16px;
+    border-radius: 16px;
+  }
+
+  .step-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .step-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .header-actions .btn-small {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    padding: 12px;
+    font-size: 0.9375rem;
+  }
+
+  .form-tips {
+    display: none;
+  }
+
+  .step-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    justify-content: center;
+    padding: 14px 20px;
+  }
+
+  .scenes-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .scene-info {
+    padding: 10px;
+  }
+
+  .scene-prompt {
+    font-size: 0.75rem;
+  }
+
+  .scene-actions {
+    padding: 0 10px 10px;
+  }
+
+  .btn-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .status-toast {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    bottom: 12px;
+  }
+
+  .campaigns-drawer {
+    width: 100%;
+  }
+
+  .campaign-card {
+    padding: 10px;
+  }
+
+  .campaign-preview {
+    width: 60px;
+    height: 45px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ads-page {
+    padding: 8px;
+  }
+
+  .header-content h1 {
+    font-size: 1.125rem;
+  }
+
+  .campaigns-toggle {
+    padding: 8px;
+  }
+
+  .step-panel {
+    padding: 16px 12px;
+    border-radius: 12px;
+  }
+
+  .scenes-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

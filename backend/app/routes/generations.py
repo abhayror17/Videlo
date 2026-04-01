@@ -28,7 +28,8 @@ from ..schemas import (
     PromptEnhanceRequest,
     PromptEnhanceResponse,
     NanoBananaRequest,
-    NanoBananaResponse
+    NanoBananaResponse,
+    VideoReplaceRequest
 )
 from ..services.deapi import get_deapi_client
 
@@ -43,14 +44,29 @@ router = APIRouter(prefix="/api", tags=["generations"])
 
 
 async def poll_for_result(request_id: str, generation_id: int):
-    """Background task to poll for generation result from deAPI."""
+    """
+    Background task to poll for generation result from deAPI.
+    
+    Optimized polling strategy to minimize API requests:
+    - Uses exponential backoff: starts at 10s, increases to 30s max
+    - Maximum 20 polls over ~8 minutes (instead of 120 polls in 6 min)
+    - Stops immediately on completion, error, or 404 (expired)
+    """
     import asyncio
     from ..database import SessionLocal
     
     client = get_deapi_client()
     
-    for _ in range(120):  # Poll for up to 10 minutes
-        await asyncio.sleep(3)  # Poll every 3 seconds for more responsive updates
+    # Exponential backoff polling: 10s -> 15s -> 20s -> 25s -> 30s (max)
+    # Total ~8 minutes with 20 polls max
+    max_polls = 20
+    min_delay = 10  # Start at 10 seconds
+    max_delay = 30  # Max 30 seconds between polls
+    
+    for poll_count in range(max_polls):
+        # Calculate delay with exponential backoff (capped at max_delay)
+        delay = min(min_delay + (poll_count * 2), max_delay)
+        await asyncio.sleep(delay)
         
         db = SessionLocal()
         try:
@@ -66,32 +82,57 @@ async def poll_for_result(request_id: str, generation_id: int):
             if not generation:
                 return
             
-            if status == "done":  # Completed
+            if status == "done":  # Completed - STOP POLLING
                 generation.status = "completed"
                 generation.progress = 100
                 generation.remote_url = data.get("result_url")
                 generation.completed_at = datetime.now(timezone.utc)
                 db.commit()
+                print(f"[Poll] Generation {generation_id} completed after {poll_count + 1} polls")
                 return
-            elif status == "error":  # Failed
+            elif status == "error":  # Failed - STOP POLLING
                 generation.status = "failed"
                 generation.error_message = data.get("error", "Generation failed")
                 db.commit()
+                print(f"[Poll] Generation {generation_id} failed after {poll_count + 1} polls")
                 return
             elif status in ("processing", "pending"):
                 generation.status = "processing"
                 # Use real progress from API, cap at 98% until complete
                 generation.progress = min(98, int(progress) if progress else 5)
                 db.commit()
-                # Continue polling
+                # Continue polling with backoff
                 
         except Exception as e:
             db.rollback()
             import traceback
-            print(f"Polling error: {e}")
-            traceback.print_exc()
+            error_str = str(e)
+            print(f"[Poll] Error polling generation {generation_id}: {e}")
+            
+            # If 404, the request doesn't exist on deAPI - mark as failed and STOP
+            if "404" in error_str or "Not Found" in error_str:
+                generation = db.query(Generation).filter(Generation.id == generation_id).first()
+                if generation:
+                    generation.status = "failed"
+                    generation.error_message = "Request expired or not found on remote server"
+                    db.commit()
+                    print(f"[Poll] Generation {generation_id} marked as failed due to 404")
+                return
+            # For other errors, continue polling
         finally:
             db.close()
+    
+    # If we exhausted all polls, mark as failed
+    print(f"[Poll] Generation {generation_id} timed out after {max_polls} polls")
+    db = SessionLocal()
+    try:
+        generation = db.query(Generation).filter(Generation.id == generation_id).first()
+        if generation and generation.status == "processing":
+            generation.status = "failed"
+            generation.error_message = "Generation timed out"
+            db.commit()
+    finally:
+        db.close()
 
 
 @router.post("/generate/text2img", response_model=GenerationResponse)
@@ -198,16 +239,15 @@ async def create_txt2video(
     
     try:
         # Call deAPI txt2video endpoint
+        # Note: Ltx2_3_22B_Dist_INT8 doesn't support steps/guidance
         result = await client.generate_txt2video(
             prompt=request.prompt,
             model=request.model,
-            width=request.width,
-            height=request.height,
-            guidance=request.guidance,
-            steps=request.steps,
-            frames=request.frames,
+            width=max(512, request.width or 512),
+            height=max(512, request.height or 512),
+            frames=max(49, request.frames or 97),
             seed=actual_seed,
-            fps=request.fps
+            fps=24  # Fixed at 24 for LTX-2.3
         )
         
         # Update with request_id from deAPI
@@ -324,17 +364,17 @@ async def create_img2video(
                     last_frame_content = response.content
         
         # Call deAPI img2video endpoint
+        # Note: Ltx2_3_22B_Dist_INT8 doesn't support steps/guidance
+        # Ensure valid constraints: frames>=49, fps=24, width>=512, height>=512
         result = await client.generate_img2video(
             first_frame_image=image_content,
             prompt=prompt,
             model=model,
-            width=width,
-            height=height,
-            guidance=guidance,
-            steps=steps,
-            frames=frames,
+            width=max(512, width or 512),
+            height=max(512, height or 512),
+            frames=max(49, frames or 97),
             seed=actual_seed,
-            fps=fps,
+            fps=24,  # Fixed at 24 for LTX-2.3
             last_frame_image=last_frame_content
         )
         
@@ -681,14 +721,26 @@ async def create_txt2embedding(
 # ============================================================
 
 async def poll_for_transcription(request_id: str, transcription_id: int):
-    """Background task to poll for transcription result."""
+    """
+    Background task to poll for transcription result.
+    
+    Optimized polling strategy to minimize API requests:
+    - Uses exponential backoff: starts at 10s, increases to 30s max
+    - Maximum 20 polls over ~8 minutes (instead of 120 polls)
+    - Stops immediately on completion or error
+    """
     import asyncio
     from ..database import SessionLocal
     
     client = get_deapi_client()
     
-    for _ in range(120):
-        await asyncio.sleep(3)
+    max_polls = 20
+    min_delay = 10
+    max_delay = 30
+    
+    for poll_count in range(max_polls):
+        delay = min(min_delay + (poll_count * 2), max_delay)
+        await asyncio.sleep(delay)
         
         db = SessionLocal()
         try:
@@ -710,11 +762,13 @@ async def poll_for_transcription(request_id: str, transcription_id: int):
                 transcription.result_url = data.get("result_url")
                 transcription.completed_at = datetime.now(timezone.utc)
                 db.commit()
+                print(f"[Poll] Transcription {transcription_id} completed after {poll_count + 1} polls")
                 return
             elif status == "error":
                 transcription.status = "failed"
                 transcription.error_message = data.get("error", "Transcription failed")
                 db.commit()
+                print(f"[Poll] Transcription {transcription_id} failed after {poll_count + 1} polls")
                 return
             elif status in ("processing", "pending"):
                 transcription.status = "processing"
@@ -723,9 +777,21 @@ async def poll_for_transcription(request_id: str, transcription_id: int):
                 
         except Exception as e:
             db.rollback()
-            print(f"Transcription polling error: {e}")
+            print(f"[Poll] Transcription {transcription_id} error: {e}")
         finally:
             db.close()
+    
+    # Timeout handling
+    print(f"[Poll] Transcription {transcription_id} timed out after {max_polls} polls")
+    db = SessionLocal()
+    try:
+        transcription = db.query(Transcription).filter(Transcription.id == transcription_id).first()
+        if transcription and transcription.status == "processing":
+            transcription.status = "failed"
+            transcription.error_message = "Transcription timed out"
+            db.commit()
+    finally:
+        db.close()
 
 
 # ============================================================
@@ -1145,6 +1211,114 @@ async def create_vid_rmbg(
 
 
 # ============================================================
+# VIDEO REPLACE (WAN 2.2 ANIMATE)
+# ============================================================
+
+@router.post("/generate/video-replace", response_model=GenerationResponse)
+async def create_video_replace(
+    background_tasks: BackgroundTasks,
+    video: UploadFile = File(...),
+    character_image: UploadFile = File(...),
+    prompt: str = Form(""),
+    model: str = Form("Wan_2_2_14B_Animate_Replace"),
+    width: int = Form(None),
+    height: int = Form(None),
+    steps: int = Form(4),
+    seed: int = Form(-1),
+    db: Session = Depends(get_db)
+):
+    """
+    Replace a person in a video with a character from a reference image using WAN 2.2 Animate.
+    
+    This endpoint uses the WAN 2.2 Animate model to:
+    - Extract body motion and facial expressions from the input video
+    - Replace the person with your character image
+    - Apply relighting to match the scene
+    - Preserve background, camera movement, and scene lighting
+    
+    Input:
+    - video: Video file with a person whose movements you want to copy
+    - character_image: Clear image of the character to insert
+    - prompt: Optional text prompt to guide the replacement
+    
+    Output:
+    - Video with the character performing all actions from the original video
+    """
+    client = get_deapi_client()
+    
+    # Generate random seed if not provided
+    actual_seed = get_seed(seed)
+    
+    # Create pending record
+    generation = Generation(
+        prompt=prompt or "Video character replacement",
+        model=model,
+        generation_type="video-replace",
+        width=width,
+        height=height,
+        steps=steps,
+        seed=actual_seed,
+        status="pending",
+        progress=0
+    )
+    db.add(generation)
+    db.commit()
+    db.refresh(generation)
+    
+    try:
+        # Validate video file
+        if not video.content_type or not video.content_type.startswith("video/"):
+            raise HTTPException(status_code=400, detail="Video file must be a video format (mp4, mov, avi, etc.)")
+        
+        # Validate character image
+        if not character_image.content_type or not character_image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Character image must be an image file (jpg, png, webp)")
+        
+        # Read files
+        video_content = await video.read()
+        image_content = await character_image.read()
+        
+        # Call deAPI video-replace endpoint
+        result = await client.generate_video_replace(
+            video=video_content,
+            character_image=image_content,
+            prompt=prompt,
+            model=model,
+            width=width,
+            height=height,
+            steps=steps,
+            seed=actual_seed,
+            video_filename=video.filename,
+            image_filename=character_image.filename
+        )
+        
+        # Update with request_id from deAPI
+        data = result.get("data", {})
+        generation.uuid = data.get("request_id")
+        generation.status = "processing"
+        
+        db.commit()
+        db.refresh(generation)
+        
+        # Start polling for result
+        background_tasks.add_task(
+            poll_for_result,
+            generation.uuid,
+            generation.id
+        )
+        
+        return generation
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        generation.status = "failed"
+        generation.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
 # PROMPT ENHANCEMENT
 # ============================================================
 
@@ -1260,7 +1434,148 @@ async def get_generation_status(
     if not generation:
         raise HTTPException(status_code=404, detail="Generation not found")
     
+    # Only check deAPI for processing/pending generations (not completed/failed)
+    if generation.status in ("processing", "pending") and generation.uuid:
+        client = get_deapi_client()
+        try:
+            status = await client.get_request_status(generation.uuid)
+            data = status.get("data", {})
+            
+            if data.get("status") == "done":
+                remote_url = data.get("result_url") or data.get("download_url")
+                if remote_url:
+                    generation.remote_url = remote_url
+                    generation.status = "completed"
+                    generation.progress = 100
+                    generation.completed_at = datetime.now(timezone.utc)
+                    
+                    # Download media locally
+                    from ..utils.media import download_media
+                    local_path, local_url = await download_media(
+                        remote_url,
+                        generation.id,
+                        generation.generation_type
+                    )
+                    if local_path:
+                        generation.local_path = local_path
+                    
+                    db.commit()
+                    db.refresh(generation)
+            elif data.get("status") == "error":
+                generation.status = "failed"
+                generation.error_message = data.get("error", "Generation failed")
+                db.commit()
+        except Exception as e:
+            error_str = str(e)
+            print(f"[Status] Error checking status: {e}")
+            # If 404, the request doesn't exist on deAPI - mark as failed
+            if "404" in error_str or "Not Found" in error_str:
+                generation.status = "failed"
+                generation.error_message = "Request expired or not found on remote server"
+                db.commit()
+                print(f"[Status] Marked generation {generation_id} as failed due to 404")
+    
     return generation
+
+
+@router.post("/generations/{generation_id}/refresh-url", response_model=GenerationResponse)
+async def refresh_generation_url(
+    generation_id: int,
+    db: Session = Depends(get_db)
+):
+    """Refresh the URL for a completed generation by checking deAPI status.
+    
+    Use this when S3 signed URLs have expired.
+    Also downloads and saves media locally if not already saved.
+    """
+    generation = db.query(Generation).filter(
+        Generation.id == generation_id
+    ).first()
+    
+    if not generation:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    
+    if not generation.uuid:
+        raise HTTPException(status_code=400, detail="No request_id stored for this generation")
+    
+    if generation.status != "completed":
+        raise HTTPException(status_code=400, detail="Generation is not completed")
+    
+    # Fetch fresh status from deAPI
+    client = get_deapi_client()
+    try:
+        status = await client.get_request_status(generation.uuid)
+        data = status.get("data", {})
+        
+        if data.get("status") == "done":
+            new_url = data.get("result_url") or data.get("download_url")
+            if new_url:
+                generation.remote_url = new_url
+                
+                # Download and save locally if not already saved
+                if not generation.local_path:
+                    from ..utils.media import download_and_save_media
+                    local_path = await download_and_save_media(
+                        new_url,
+                        generation.generation_type,
+                        generation.id
+                    )
+                    if local_path:
+                        generation.local_path = local_path
+                
+                db.commit()
+                db.refresh(generation)
+        
+        return generation
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to refresh URL: {str(e)}")
+
+
+# ============================================================
+# LOCAL MEDIA SERVING
+# ============================================================
+
+@router.get("/media/{generation_type}/{filename}")
+async def serve_local_media(
+    generation_type: str,
+    filename: str
+):
+    """Serve locally stored media files.
+    
+    Args:
+        generation_type: Type of generation (text2img, txt2video, etc.)
+        filename: The media filename
+    """
+    from fastapi.responses import FileResponse
+    import os
+    
+    # Construct the path to the media file
+    media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
+    file_path = os.path.join(media_dir, generation_type, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Media file not found")
+    
+    # Determine content type based on extension
+    ext = os.path.splitext(filename)[1].lower()
+    content_types = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp',
+        '.gif': 'image/gif',
+        '.mp4': 'video/mp4',
+        '.webm': 'video/webm',
+        '.mp3': 'audio/mpeg',
+        '.wav': 'audio/wav'
+    }
+    media_type = content_types.get(ext, 'application/octet-stream')
+    
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        filename=filename
+    )
 
 
 # ============================================================

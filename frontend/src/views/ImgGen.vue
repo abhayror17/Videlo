@@ -154,6 +154,21 @@
               </button>
             </div>
             
+            <!-- Model and Aspect Ratio Selectors -->
+            <div class="prompt-options">
+              <select v-model="model" class="option-select">
+                <option value="nano-banana-2">Nano Banana 2</option>
+                <option value="nano-banana-pro">Nano Banana Pro</option>
+              </select>
+              <select v-model="aspectRatio" class="option-select">
+                <option value="1:1">1:1</option>
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+              </select>
+            </div>
+            
             <button
               @click="handleGenerate"
               :disabled="!prompt.trim() || generating"
@@ -169,47 +184,6 @@
                 </svg>
                 <span>{{ referenceImages.length > 0 ? `Generate (Img2Img)` : 'Generate' }}</span>
               </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Options Bar -->
-      <div class="options-bar">
-        <!-- Model Selection -->
-        <div class="option-group">
-          <label>{{ $t('imgGen.model') || 'Model' }}</label>
-          <div class="model-options">
-            <button 
-              :class="['model-btn', { active: model === 'nano-banana-2' }]"
-              @click="model = 'nano-banana-2'"
-            >
-              <span class="model-name">Nano Banana 2</span>
-              <span class="model-desc">Fast</span>
-            </button>
-            <button 
-              :class="['model-btn', { active: model === 'nano-banana-pro' }]"
-              @click="model = 'nano-banana-pro'"
-            >
-              <span class="model-name">Nano Banana Pro</span>
-              <span class="model-desc">Quality</span>
-            </button>
-          </div>
-        </div>
-        
-        <!-- Aspect Ratio -->
-        <div class="option-group">
-          <label>{{ $t('imgGen.aspectRatio') || 'Aspect Ratio' }}</label>
-          <div class="aspect-options">
-            <button 
-              v-for="ar in aspectRatios" 
-              :key="ar.value"
-              :class="['aspect-btn', { active: aspectRatio === ar.value }]"
-              @click="aspectRatio = ar.value"
-              :title="ar.label"
-            >
-              <div class="aspect-preview" :style="{ aspectRatio: ar.preview }"></div>
-              <span>{{ ar.label }}</span>
             </button>
           </div>
         </div>
@@ -879,116 +853,129 @@ export default {
   animation: spin 0.8s linear infinite;
 }
 
-/* Options Bar */
-.options-bar {
+/* Prompt Options - Model and Aspect Ratio dropdowns */
+.prompt-options {
   display: flex;
-  gap: 24px;
-  padding: 20px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-}
-
-.option-group {
-  display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 
-.option-group label {
-  font-size: 0.75rem;
-  font-weight: 600;
+.option-label {
+  font-size: 0.7rem;
+  font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  margin-right: -4px;
 }
 
-.model-options {
-  display: flex;
-  gap: 8px;
-}
-
-.model-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 20px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 130px;
-}
-
-.model-btn:hover {
-  border-color: var(--border-hover);
-}
-
-.model-btn.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #000;
-}
-
-.model-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.model-desc {
-  font-size: 0.7rem;
-  opacity: 0.7;
-}
-
-.model-btn.active .model-desc {
-  opacity: 0.8;
-}
-
-.aspect-options {
-  display: flex;
-  gap: 8px;
-}
-
-.aspect-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+.option-select {
   padding: 10px 14px;
-  background: var(--bg-elevated);
+  background: var(--bg-panel);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A3A3A3' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+  min-width: 120px;
 }
 
-.aspect-btn:hover {
+.option-select:hover {
   border-color: var(--border-hover);
+  background-color: var(--bg-elevated);
 }
 
-.aspect-btn.active {
-  background: var(--accent-primary);
+.option-select:focus {
+  outline: none;
   border-color: var(--accent-primary);
-  color: #000;
 }
 
-.aspect-preview {
-  width: 24px;
-  height: 24px;
-  background: currentColor;
-  opacity: 0.5;
-  border-radius: 2px;
+.option-select option {
+  background: var(--bg-panel) !important;
+  color: var(--text-primary) !important;
+  padding: 8px;
 }
 
-.aspect-btn.active .aspect-preview {
-  opacity: 0.3;
-  background: #000;
-}
-
-.aspect-btn span {
-  font-size: 0.7rem;
-  font-weight: 600;
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .gen-container {
+    gap: 16px;
+  }
+  
+  .preview-area {
+    min-height: 200px;
+  }
+  
+  .prompt-area {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .prompt-wrapper {
+    border-radius: 10px;
+  }
+  
+  .prompt-input {
+    padding: 14px 16px;
+    font-size: 0.875rem;
+  }
+  
+  .prompt-footer {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  
+  .prompt-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .prompt-options {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  
+  .option-select {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    padding-right: 28px;
+    font-size: 0.75rem;
+    background-position: right 8px center;
+  }
+  
+  .generate-btn {
+    flex: 1;
+    padding: 12px 20px;
+  }
+  
+  .modal-backdrop {
+    padding: 20px;
+  }
+  
+  .image-modal img {
+    max-height: calc(80vh - 60px);
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* Modal */
@@ -1070,21 +1057,5 @@ export default {
 .action-btn svg {
   width: 18px;
   height: 18px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .options-bar {
-    flex-direction: column;
-    gap: 16px;
-  }
-  
-  .model-options, .aspect-options {
-    flex-wrap: wrap;
-  }
-  
-  .model-btn {
-    min-width: 100px;
-  }
 }
 </style>

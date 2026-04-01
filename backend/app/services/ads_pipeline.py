@@ -915,10 +915,17 @@ class AdsPipelineClient:
         prompt: str,
         width: int = 768,
         height: int = 768,
-        model: str = "Ltx2_19B_Dist_FP8",
-        frames: int = 48
+        model: str = "Ltx2_3_22B_Dist_INT8",
+        frames: int = 120
     ) -> dict:
-        """Submit image-to-video request to deAPI."""
+        """Submit image-to-video request to deAPI.
+        
+        Note: LTX-2.3 doesn't support guidance/steps parameters.
+        Returns request_id for polling.
+        """
+        # Ensure minimum frames for LTX-2.3
+        frames = max(49, frames)
+        
         async with aiohttp.ClientSession(
             connector=self._create_connector(),
             headers=self.headers,
@@ -929,15 +936,13 @@ class AdsPipelineClient:
                 img_response.raise_for_status()
                 image_data = await img_response.read()
             
-            # Build multipart form data
+            # Build multipart form data - NO guidance/steps for LTX-2.3
             data = aiohttp.FormData()
             data.add_field('first_frame_image', image_data, filename='first_frame.png', content_type='image/png')
             data.add_field('prompt', prompt)
             data.add_field('model', model)
-            data.add_field('width', str(width))
-            data.add_field('height', str(height))
-            data.add_field('guidance', '3.5')
-            data.add_field('steps', '20')
+            data.add_field('width', str(max(512, width)))
+            data.add_field('height', str(max(512, height)))
             data.add_field('frames', str(frames))
             data.add_field('seed', '-1')
             data.add_field('fps', '24')
@@ -946,7 +951,10 @@ class AdsPipelineClient:
                 f"{self.deapi_base_url}/api/v1/client/img2video",
                 data=data
             ) as response:
-                response.raise_for_status()
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"[submit_img2video] Error: {error_text}")
+                    response.raise_for_status()
                 result = await response.json()
                 return result.get("data", result)
     

@@ -4,6 +4,22 @@ from sqlalchemy.orm import relationship
 from .database import Base
 
 
+class User(Base):
+    """User model aligned with the SQLite migration-backed users table."""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    credits_balance = Column(Integer, default=0)
+    total_credits_purchased = Column(Integer, default=0)
+    total_credits_used = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    generations = relationship("Generation", back_populates="user")
+
+
 class Generation(Base):
     """Model for image/video/audio generation results."""
     __tablename__ = "generations"
@@ -41,7 +57,8 @@ class Generation(Base):
     
     status = Column(String, default="pending")  # pending, processing, completed, failed
     progress = Column(Integer, default=0)  # 0-100 progress percentage
-    remote_url = Column(String, nullable=True)  # Result URL
+    remote_url = Column(String, nullable=True)  # Original deAPI URL (may expire)
+    local_path = Column(String, nullable=True)  # Local stored file path (permanent)
     thumbnail_url = Column(String, nullable=True)
     file_size = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
@@ -309,3 +326,196 @@ class Workflow(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AiAvatarProject(Base):
+    """
+    Model for AI Video Avatar Pipeline.
+    
+    3-Step Pipeline:
+    1. Generate Portrait (txt2img - FLUX-2 Klein)
+    2. Generate Voice (txt2audio - Kokoro/Chatterbox)
+    3. Animate (aud2video - LTX-2.3)
+    """
+    __tablename__ = "ai_avatar_projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # User inputs
+    name = Column(String(100), nullable=True)  # Project name
+    portrait_prompt = Column(Text, nullable=False)  # Prompt for portrait generation
+    speech_text = Column(Text, nullable=False)  # Text to convert to speech
+    motion_prompt = Column(Text, nullable=True)  # Animation direction prompt
+    
+    # Voice settings
+    voice_model = Column(String(50), default="Kokoro")  # Kokoro, Chatterbox
+    voice_id = Column(String(50), default="af_sky")  # Voice ID
+    voice_speed = Column(Float, default=1.0)
+    voice_lang = Column(String(20), default="en-us")
+    
+    # Portrait settings
+    portrait_model = Column(String(50), default="Flux_2_Klein_4B_BF16")
+    portrait_width = Column(Integer, default=512)
+    portrait_height = Column(Integer, default=512)
+    
+    # Animation settings
+    animation_model = Column(String(50), default="Ltx2_3_22B_Dist_INT8")
+    animation_frames = Column(Integer, default=97)  # min 49, max 241
+    animation_fps = Column(Integer, default=24)  # fixed at 24 for LTX-2.3
+    
+    # Generation results with deAPI request_ids
+    portrait_request_id = Column(String, nullable=True)  # deAPI request_id for portrait
+    portrait_url = Column(String, nullable=True)  # Generated portrait URL
+    portrait_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    portrait_status = Column(String, default="pending")
+    
+    audio_request_id = Column(String, nullable=True)  # deAPI request_id for audio
+    audio_url = Column(String, nullable=True)  # Generated audio URL
+    audio_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    audio_status = Column(String, default="pending")
+    
+    video_request_id = Column(String, nullable=True)  # deAPI request_id for video
+    video_url = Column(String, nullable=True)  # Final animated video URL
+    video_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    video_status = Column(String, default="pending")
+    
+    # Current step (1=portrait, 2=audio, 3=video)
+    current_step = Column(Integer, default=1)
+    overall_status = Column(String, default="pending")  # pending, processing, completed, failed
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+# ==============================================================================
+# UGC AI ADS CREATOR - NEW MODELS
+# ==============================================================================
+
+class UgcAdStory(Base):
+    """
+    Model for UGC AI Ads Creator - Complete ad story with scenes and shots.
+    
+    This model stores the generated story structure including characters,
+    product info, scenes, and shots that form a complete UGC ad.
+    """
+    __tablename__ = "ugc_ad_stories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Story metadata
+    title = Column(String(255), nullable=False)
+    story_id = Column(String(100), unique=True, index=True, nullable=False)
+    target_platform = Column(String(50), default="Instagram")
+    total_duration_sec = Column(Integer, default=15)
+    
+    # Story content
+    hook = Column(Text, nullable=False)
+    cta = Column(Text, nullable=False)
+    setting_description = Column(Text, nullable=True)
+    
+    # Characters (stored as JSON array)
+    characters = Column(JSON, nullable=False, default=list)
+    
+    # Product info
+    product_name = Column(String(255), nullable=False)
+    product_category = Column(String(100), nullable=True)
+    product_description = Column(Text, nullable=True)
+    product_key_features = Column(JSON, nullable=True, default=list)
+    product_visual_description = Column(Text, nullable=True)
+    
+    # Reference images
+    character_reference_url = Column(String, nullable=True)
+    product_reference_url = Column(String, nullable=True)
+    
+    # Inspiration prompts used
+    inspiration_prompts = Column(JSON, nullable=True, default=list)
+    
+    # Status
+    status = Column(String(50), default="draft")  # draft, generating, images_ready, videos_ready, completed, failed
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    scenes = relationship("UgcScene", back_populates="story", cascade="all, delete-orphan", order_by="UgcScene.scene_num")
+
+
+class UgcScene(Base):
+    """
+    Model for a scene within a UGC ad story.
+    Each scene contains multiple shots (5-second segments).
+    """
+    __tablename__ = "ugc_scenes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    story_id = Column(Integer, ForeignKey("ugc_ad_stories.id"), nullable=False, index=True)
+    
+    # Scene metadata
+    scene_num = Column(Integer, nullable=False)
+    scene_name = Column(String(255), nullable=False)
+    setting = Column(Text, nullable=True)
+    mood = Column(String(100), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    story = relationship("UgcAdStory", back_populates="scenes")
+    shots = relationship("UgcShot", back_populates="scene", cascade="all, delete-orphan", order_by="UgcShot.shot_num")
+
+
+class UgcShot(Base):
+    """
+    Model for a shot within a UGC scene.
+    Each shot represents a 5-second video segment with first/last frames.
+    """
+    __tablename__ = "ugc_shots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scene_id = Column(Integer, ForeignKey("ugc_scenes.id"), nullable=False, index=True)
+    
+    # Shot metadata
+    shot_num = Column(Integer, nullable=False)
+    duration_sec = Column(Integer, default=5)
+    
+    # Content
+    frame_description = Column(Text, nullable=False)  # For image generation
+    action = Column(Text, nullable=True)
+    dialogue = Column(Text, nullable=True)
+    camera_angle = Column(String(100), nullable=True)
+    lighting = Column(String(100), nullable=True)
+    audio_notes = Column(Text, nullable=True)
+    
+    # Image generation (first frame)
+    first_frame_prompt = Column(Text, nullable=True)
+    first_frame_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    first_frame_url = Column(String, nullable=True)
+    first_frame_status = Column(String, default="pending")  # pending, processing, completed, failed
+    
+    # Image generation (last frame - optional, for transitions)
+    last_frame_prompt = Column(Text, nullable=True)
+    last_frame_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    last_frame_url = Column(String, nullable=True)
+    last_frame_status = Column(String, default="pending")
+    
+    # Video generation
+    video_prompt = Column(Text, nullable=True)
+    video_generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    video_url = Column(String, nullable=True)
+    video_status = Column(String, default="pending")
+    
+    # Error tracking
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    scene = relationship("UgcScene", back_populates="shots")

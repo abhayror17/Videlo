@@ -44,10 +44,26 @@
       <div class="form-row">
         <label>{{ $t('settings.duration') }}</label>
         <select v-model.number="localData.frames" @change="updateData" class="form-select">
-          <option :value="49">~2 {{ $t('settings.seconds') }}</option>
-          <option :value="120">~5 {{ $t('settings.seconds') }}</option>
-          <option :value="241">~10 {{ $t('settings.seconds') }}</option>
+          <option :value="49">~2 sec (Short)</option>
+          <option :value="97">~4 sec (Medium)</option>
+          <option :value="120">~5 sec</option>
+          <option :value="161">~7 sec (Long)</option>
+          <option :value="241">~10 sec (Max)</option>
         </select>
+      </div>
+      
+      <!-- End Frame Preview (optional) -->
+      <div v-if="localData.endFrameUrl" class="end-frame-section">
+        <label>{{ $t('workflow.endFrame') }}</label>
+        <div class="end-frame-preview">
+          <img :src="localData.endFrameUrl" alt="End frame" />
+          <button class="clear-end-frame" @click="clearEndFrame" title="Clear end frame">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
       </div>
       
       <!-- Result Preview -->
@@ -56,7 +72,10 @@
         <div class="result-badge">Video</div>
       </div>
     </div>
-    <Handle type="target" :position="Position.Left" class="node-handle target" />
+    <!-- Start Frame Input (top left) -->
+    <Handle type="target" :position="Position.Left" id="start-frame" class="node-handle target start-handle" />
+    <!-- End Frame Input (bottom left) -->
+    <Handle type="target" :position="Position.Left" id="end-frame" class="node-handle target end-handle" />
     <Handle type="source" :position="Position.Right" class="node-handle source" />
   </div>
 </template>
@@ -72,11 +91,14 @@ const props = defineProps({
 
 const { updateNodeData, removeNodes } = useVueFlow()
 
-// Aspect ratios for video
+// Aspect ratios for video - LTX-2.3 supports 512-1024px
 const aspectRatios = [
-  { value: '16:9', label: '16:9 (Landscape)', width: 768, height: 432 },
-  { value: '9:16', label: '9:16 (Portrait)', width: 432, height: 768 },
-  { value: '1:1', label: '1:1 (Square)', width: 512, height: 512 },
+  { value: '16:9', label: '16:9 Landscape', width: 768, height: 432 },
+  { value: '16:9-hd', label: '16:9 HD', width: 1024, height: 576 },
+  { value: '9:16', label: '9:16 Portrait', width: 432, height: 768 },
+  { value: '9:16-hd', label: '9:16 HD', width: 576, height: 1024 },
+  { value: '1:1', label: '1:1 Square', width: 512, height: 512 },
+  { value: '1:1-hd', label: '1:1 HD', width: 1024, height: 1024 },
   { value: '4:3', label: '4:3', width: 640, height: 480 },
   { value: '3:4', label: '3:4', width: 480, height: 640 }
 ]
@@ -89,6 +111,8 @@ const localData = ref({
   height: props.data.height || 432,
   frames: props.data.frames || 49,
   resultUrl: props.data.resultUrl || null,
+  endFrameUrl: props.data.endFrameUrl || null,
+  endFrameData: props.data.endFrameData || null,
   status: props.data.status || 'idle'
 })
 
@@ -109,6 +133,12 @@ const onAspectChange = () => {
 
 const updateData = () => {
   updateNodeData(props.id, { ...localData.value })
+}
+
+const clearEndFrame = () => {
+  localData.value.endFrameUrl = null
+  localData.value.endFrameData = null
+  updateData()
 }
 
 const deleteNode = () => {
@@ -335,6 +365,65 @@ const deleteNode = () => {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.end-frame-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.end-frame-section label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.end-frame-preview {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.end-frame-preview img {
+  width: 100%;
+  max-height: 100px;
+  object-fit: cover;
+  display: block;
+}
+
+.clear-end-frame {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.8);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.clear-end-frame:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.clear-end-frame svg {
+  width: 12px;
+  height: 12px;
+}
+
 .node-handle {
   width: 10px !important;
   height: 10px !important;
@@ -346,5 +435,18 @@ const deleteNode = () => {
 .node-handle:hover {
   transform: scale(1.3);
   background: #0EA5E9 !important;
+}
+
+.start-handle {
+  top: 80px !important;
+}
+
+.end-handle {
+  top: calc(100% - 80px) !important;
+  border-color: #A855F7 !important;
+}
+
+.end-handle:hover {
+  background: #A855F7 !important;
 }
 </style>

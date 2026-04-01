@@ -3,21 +3,23 @@
     <div class="card-media">
       <!-- Video -->
       <video
-        v-if="isVideo && (generation.remote_url || generation.thumbnail_url)"
-        :src="generation.remote_url || generation.thumbnail_url"
+        v-if="isVideo && mediaUrl"
+        :src="mediaUrl"
         class="media"
         muted
         loop
         playsinline
         @mouseover="playVideo"
         @mouseleave="pauseVideo"
+        @error="handleVideoError"
       />
       <!-- Image -->
       <img
-        v-else-if="generation.thumbnail_url || generation.remote_url"
-        :src="generation.thumbnail_url || generation.remote_url"
+        v-else-if="mediaUrl"
+        :src="mediaUrl"
         :alt="generation.prompt"
         class="media"
+        @error="handleImageError"
       />
       <!-- Processing Placeholder -->
       <div v-else class="placeholder">
@@ -50,7 +52,7 @@
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
             </svg>
           </button>
-          <a :href="mediaUrl" :download="downloadFilename" class="action-btn" @click.stop :title="$t('common.download')">
+          <a :href="mediaUrl" target="_blank" rel="noopener noreferrer" class="action-btn" @click.stop :title="$t('common.download')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
             </svg>
@@ -69,6 +71,20 @@
         </div>
       </div>
     </div>
+    
+    <!-- Prompt Display (1 line, click to expand) -->
+    <div v-if="generation.prompt && generation.status === 'completed'" class="prompt-section">
+      <div 
+        class="prompt-text" 
+        :class="{ expanded: promptExpanded }"
+        @click="togglePrompt"
+      >
+        {{ generation.prompt }}
+      </div>
+      <button v-if="!promptExpanded && isLongPrompt" class="prompt-more" @click="togglePrompt">
+        {{ $t('common.showMore') }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -86,19 +102,34 @@ export default {
     }
   },
   emits: ['fullscreen', 'create-video', 'use-image'],
+  data() {
+    return {
+      refreshing: false,
+      promptExpanded: false
+    }
+  },
   computed: {
     isVideo() {
       return this.generation.generation_type === 'img2video' ||
+        this.generation.generation_type === 'txt2video' ||
+        this.generation.generation_type === 'audio2video' ||
         (this.generation.remote_url && 
          (this.generation.remote_url.endsWith('.mp4') || 
           this.generation.remote_url.endsWith('.webm')))
     },
     mediaUrl() {
+      // Prefer local_path if available (won't expire)
+      if (this.generation.local_path) {
+        return `/api/media/${this.generation.generation_type}/${this.generation.local_path.split('/').pop()}`
+      }
       return this.generation.remote_url || this.generation.thumbnail_url
     },
     downloadFilename() {
       const ext = this.isVideo ? '.mp4' : '.png'
       return `videlo-${this.generation.id}${ext}`
+    },
+    isLongPrompt() {
+      return this.generation.prompt && this.generation.prompt.length > 50
     }
   },
   methods: {
@@ -108,6 +139,53 @@ export default {
     pauseVideo(e) {
       e.target.pause()
       e.target.currentTime = 0
+    },
+    togglePrompt() {
+      this.promptExpanded = !this.promptExpanded
+    },
+    async handleVideoError(e) {
+      // Try to refresh the URL if it's expired
+      if (this.generation.uuid && !this.refreshing) {
+        this.refreshing = true
+        try {
+          const response = await fetch(`/api/generations/${this.generation.id}/refresh-url`, {
+            method: 'POST'
+          })
+          if (response.ok) {
+            const data = await response.json()
+            if (data.remote_url) {
+              this.generation.remote_url = data.remote_url
+              e.target.src = data.remote_url
+            }
+          }
+        } catch (err) {
+          // Silently handle refresh errors
+        } finally {
+          this.refreshing = false
+        }
+      }
+    },
+    async handleImageError(e) {
+      // Try to refresh the URL if it's expired
+      if (this.generation.uuid && !this.refreshing) {
+        this.refreshing = true
+        try {
+          const response = await fetch(`/api/generations/${this.generation.id}/refresh-url`, {
+            method: 'POST'
+          })
+          if (response.ok) {
+            const data = await response.json()
+            if (data.remote_url) {
+              this.generation.remote_url = data.remote_url
+              e.target.src = data.remote_url
+            }
+          }
+        } catch (err) {
+          // Silently handle refresh errors
+        } finally {
+          this.refreshing = false
+        }
+      }
     }
   }
 }
@@ -247,5 +325,50 @@ export default {
 
 .action-btn.use:hover {
   background: var(--accent-secondary);
+}
+
+/* Prompt Section */
+.prompt-section {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+}
+
+.prompt-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prompt-text.expanded {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: vertical;
+}
+
+.prompt-text:hover {
+  color: var(--text-primary);
+}
+
+.prompt-more {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.prompt-more:hover {
+  color: var(--accent-secondary);
 }
 </style>
